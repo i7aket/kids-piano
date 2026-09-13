@@ -70,10 +70,12 @@ button{font-family:inherit;touch-action:manipulation}
 .chip.on b{color:#2A1B00}
 .chip.on span{color:#6A4A05}
 
-.line{font-family:var(--display);font-weight:700;font-size:clamp(14px,3.4vw,19px);
-  line-height:1.35;color:#5D769E;padding:4px 2px clamp(9px,2.2vw,15px);
-  transition:color .12s linear}
-.line.now{color:var(--snow)}
+.line{display:grid;grid-template-columns:repeat(var(--cols,8),minmax(0,1fr));
+  gap:clamp(4px,1vw,7px);padding:5px 0 clamp(9px,2.2vw,15px)}
+.line .text{min-width:max-content;font-family:var(--display);font-weight:700;
+  font-size:clamp(14px,3.4vw,19px);line-height:1.35;color:#5D769E;
+  text-align:justify;text-align-last:justify;transition:color .12s linear}
+.line.now .text{color:var(--snow)}
 .syl.on{color:var(--red)}
 
 .snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
@@ -542,8 +544,12 @@ function select(s){
     // one lyric line per phrase: words stay whole, each syllable is its own span
     const line = document.createElement("div");
     line.className = "line";
+    const text = document.createElement("div");
+    text.className = "text";
+    text.style.gridColumn = "span " + ph.length;
+    line.appendChild(text);
     (lines[pi] || "").split(" ").forEach((word, wi) => {
-      if (wi) line.appendChild(document.createTextNode(" "));
+      if (wi) text.appendChild(document.createTextNode(" "));
       const w = document.createElement("span");
       word.split("|").forEach(syl => {
         const sp = document.createElement("span");
@@ -552,7 +558,7 @@ function select(s){
         w.appendChild(sp);
         lyricEls.push(sp);
       });
-      line.appendChild(w);
+      text.appendChild(w);
     });
     stripEl.appendChild(line);
     lineEls.push(line);
@@ -618,9 +624,19 @@ function pause(){
   setMode("paused");
 }
 
+// A note scheduled at ctx time T is only heard at T + output latency, while a
+// timer fires on the dot, so without this the highlight runs ahead of the sound.
+// ponytail: auto value only; add a manual offset if a device misreports it.
+function outLagMs(c){
+  const l = typeof c.outputLatency === "number" && c.outputLatency > 0
+    ? c.outputLatency : (c.baseLatency || 0) * 2;
+  return Math.min(l * 1000, 400);
+}
+
 function start(){
   const c = audio();
   const beat = 60 / Number(tempoEl.value);
+  const lag = outLagMs(c);
   t0 = c.currentTime + .2;
   marks = [];
   let t = 0;
@@ -641,14 +657,14 @@ function start(){
         lineEls.forEach(l => l.classList.toggle("now", l === syl.closest(".line")));
       }
       light(keyEls[n], lit);
-    }, (t0 + t - c.currentTime) * 1000));
+    }, (t0 + t - c.currentTime) * 1000 + lag));
     t += dur;
   }
   timers.push(setTimeout(() => {
     clearHighlights();
     cursor = 0;
     setMode("stopped");
-  }, (t0 + t - c.currentTime) * 1000 + 500));
+  }, (t0 + t - c.currentTime) * 1000 + lag + 500));
   setMode("playing");
 }
 
