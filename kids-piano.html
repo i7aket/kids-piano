@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0E1E3C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Kids Piano — One-Hand Melodies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0E1E3C;
+  --snow:#F2F7FF;
+  --gold:#F6C453;
+  --mint:#7BDDBE;
+  --berry:#E9684F;
+  --dim:#8FA6CC;
+  --line:#2A487A;
+  --card:#1B3157;
+  --display:"Comfortaa","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;overscroll-behavior:none}
+body{
+  background:var(--night);color:var(--snow);font-family:var(--body);
+  min-height:100dvh;padding:16px 16px 0;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+button{font-family:inherit;touch-action:manipulation}
+.wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;min-height:100dvh}
+
+.songs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.song{
+  background:var(--card);color:var(--snow);border:1px solid var(--line);
+  border-radius:999px;padding:10px 15px;font-size:14.5px;font-weight:600;cursor:pointer;
+}
+.song[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#0A2A21}
+
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.play{
+  display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#2A1B00;
+  border:none;border-radius:999px;padding:14px 26px;min-height:52px;
+  font-family:var(--display);font-weight:700;font-size:18px;cursor:pointer;
+}
+.play.playing{background:var(--berry);color:#fff}
+.play:focus-visible,.song:focus-visible,.tempo input:focus-visible,.key:focus-visible,.black:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
+.tempo{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:14px}
+.tempo input{width:130px;height:34px;accent-color:var(--mint)}
+.tip{color:var(--dim);font-size:14.5px;line-height:1.5;margin:0 0 18px}
+
+.strip{display:flex;flex-direction:column;gap:clamp(4px,1vw,8px);margin-bottom:20px}
+.phrase{display:grid;grid-template-columns:repeat(var(--cols,8),minmax(0,1fr));gap:clamp(4px,1vw,7px)}
+.chip{min-width:0;padding:clamp(5px,1.4vw,8px) 0 clamp(4px,1.2vw,7px);border-radius:11px;background:var(--card);border:1px solid var(--line);text-align:center}
+.chip b{display:block;font-family:var(--display);font-weight:700;font-size:clamp(13px,3.2vw,20px);line-height:1}
+.chip span{display:block;font-size:clamp(10px,2.1vw,12px);color:var(--dim);margin-top:3px}
+.chip.on{background:var(--gold);border-color:var(--gold)}
+.chip.on b{color:#2A1B00}
+.chip.on span{color:#6A4A05}
+
+.dock{
+  position:sticky;bottom:0;margin-top:auto;
+  background:linear-gradient(to top,var(--night) 76%,rgba(14,30,60,0));
+  padding:14px 0 calc(10px + env(safe-area-inset-bottom));
+}
+.board{position:relative;border-radius:14px;background:#060F22;padding:10px 10px 0}
+.whites{display:flex;gap:0;height:100%}
+.key{
+  flex:1;min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
+  cursor:pointer;border-radius:0 0 10px 10px;background:var(--snow);
+  display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;
+  touch-action:none;transition:background .05s linear,transform .05s linear;
+}
+.key.mute{background:#CFD9EA}
+.key.on{background:var(--gold);transform:translateY(3px)}
+.finger{
+  width:clamp(24px,6.4vw,30px);height:clamp(24px,6.4vw,30px);border-radius:50%;
+  background:#0E1E3C;color:var(--snow);font-family:var(--display);font-weight:700;
+  font-size:clamp(13px,3.4vw,15px);display:flex;align-items:center;justify-content:center;
+}
+.finger.step{box-shadow:0 0 0 2px var(--mint)}
+.name{font-family:var(--display);font-weight:700;font-size:clamp(14px,3.6vw,17px);color:#12213D}
+.key.mute .name{color:#5F7091}
+#blacks{position:absolute;top:10px;left:10px;right:10px;height:0}
+.black{
+  position:absolute;top:0;border:none;background:#0A1730;border-radius:0 0 8px 8px;
+  cursor:pointer;touch-action:none;transition:background .05s linear;
+}
+.black.on{background:var(--mint)}
+
+.hint{color:var(--dim);font-size:13.5px;line-height:1.6;margin:10px 0 0}
+.hint kbd{font-family:var(--body);font-size:12.5px;font-weight:700;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--snow)}
+@media (pointer:coarse){.hint.desktop{display:none}}
+@media (pointer:fine){.hint.touch{display:none}}
+@media (prefers-reduced-motion:reduce){.key,.chip,.black{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="songs" id="songs"></div>
+
+  <div class="bar">
+    <button class="play" id="play"><span id="glyph">▶</span><span id="playLabel">Play</span></button>
+    <button class="song" id="restart" type="button">↺ Restart</button>
+    <label class="tempo">Tempo
+      <input type="range" id="tempo" min="50" max="140" value="90" step="2">
+      <span id="bpm">90</span>
+    </label>
+  </div>
+  <p class="tip" id="tip"></p>
+
+  <div class="strip" id="strip"></div>
+
+  <div class="dock">
+    <div class="board" id="board">
+      <div class="whites" id="whites"></div>
+      <div id="blacks"></div>
+    </div>
+    <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>6</kbd> or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd>. Space starts and stops the melody.</p>
+    <p class="hint touch">You can press several keys at once. If there is no sound, make sure your phone is not in silent mode.</p>
+  </div>
+
+</div>
+
+<script>
+const WHITE = [
+  {n:"C",  f:261.63, finger:"1"},
+  {n:"D",  f:293.66, finger:"2"},
+  {n:"E",  f:329.63, finger:"3"},
+  {n:"F",  f:349.23, finger:"4"},
+  {n:"G",  f:392.00, finger:"5"},
+  {n:"A",  f:440.00, finger:"5", step:true},
+  {n:"B",  f:493.88, finger:null},
+  {n:"C5", f:523.25, finger:null}
+];
+const BLACK = [
+  {after:0, f:277.18},{after:1, f:311.13},
+  {after:3, f:369.99},{after:4, f:415.30},{after:5, f:466.16}
+];
+const FREQ = {}; WHITE.forEach(w => { if (w.n.length === 1) FREQ[w.n] = w.f; });
+const FINGER = {C:"1", D:"2", E:"3", F:"4", G:"5", A:"5"};
+
+const SONGS = [
+{
+  id:"jingle", title:"Jingle Bells", bpm:96,
+  tip:"The whole melody fits in five fingers, the hand never moves.",
+  phrases:[
+    [["E",1],["E",1],["E",2]],
+    [["E",1],["E",1],["E",2]],
+    [["E",1],["G",1],["C",1.5],["D",.5],["E",4]],
+    [["F",1],["F",1],["F",1.5],["F",.5],["F",1],["E",1],["E",1],["E",.5]],
+    [["E",.5],["D",1],["D",1],["E",1],["D",2],["G",2]]
+  ]
+},
+{
+  id:"twinkle", title:"Twinkle Twinkle Little Star", bpm:88,
+  tip:"On the note A the pinky steps right and comes straight back to G.",
+  phrases:[
+    [["C",1],["C",1],["G",1],["G",1],["A",1],["A",1],["G",2]],
+    [["F",1],["F",1],["E",1],["E",1],["D",1],["D",1],["C",2]],
+    [["G",1],["G",1],["F",1],["F",1],["E",1],["E",1],["D",2]],
+    [["G",1],["G",1],["F",1],["F",1],["E",1],["E",1],["D",2]],
+    [["C",1],["C",1],["G",1],["G",1],["A",1],["A",1],["G",2]],
+    [["F",1],["F",1],["E",1],["E",1],["D",1],["D",1],["C",2]]
+  ]
+},
+{
+  id:"row", title:"Row, Row, Row Your Boat", bpm:100,
+  tip:"The third line is fast, so learn it separately and slowly.",
+  phrases:[
+    [["C",1],["C",1],["C",.67],["D",.33],["E",1]],
+    [["E",.67],["D",.33],["E",.67],["F",.33],["G",2]],
+    [["C",.33],["C",.33],["C",.34],["G",.33],["G",.33],["G",.34],["E",.33],["E",.33],["E",.34],["C",.33],["C",.33],["C",.34]],
+    [["G",.67],["F",.33],["E",.67],["D",.33],["C",2]]
+  ]
+},
+{
+  id:"frere", title:"Are You Sleeping, Brother John", bpm:100,
+  tip:"The first two lines are the same, and so are the third and fourth, so it is quick to memorize.",
+  phrases:[
+    [["C",1],["D",1],["E",1],["C",1]],
+    [["C",1],["D",1],["E",1],["C",1]],
+    [["E",1],["F",1],["G",2]],
+    [["E",1],["F",1],["G",2]],
+    [["G",.5],["A",.5],["G",.5],["F",.5],["E",1],["C",1]],
+    [["G",.5],["A",.5],["G",.5],["F",.5],["E",1],["C",1]],
+    [["C",1],["G",1],["C",2]],
+    [["C",1],["G",1],["C",2]]
+  ]
+},
+{
+  id:"rain", title:"Rain, Rain, Go Away", bpm:104,
+  tip:"The shortest song, a good first one to learn by heart.",
+  phrases:[
+    [["G",1],["E",1],["G",1],["G",1],["E",1]],
+    [["G",.5],["G",.5],["E",1],["A",1],["G",.5],["G",.5],["E",1]],
+    [["F",1],["D",1],["F",1],["F",1],["D",1]],
+    [["G",1],["F",1],["E",1],["D",1],["C",2]]
+  ]
+},
+{
+  id:"ram", title:"A Ram Sam Sam", bpm:112,
+  tip:"A simplified version: the song has no single melody and is sung in many ways.",
+  phrases:[
+    [["C",1],["C",1],["C",1],["C",1]],
+    [["C",1],["C",1],["C",1],["C",1]],
+    [["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5]],
+    [["E",1],["E",1],["C",2]],
+    [["A",1],["A",1],["A",2]],
+    [["A",1],["A",1],["A",2]],
+    [["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5]],
+    [["E",1],["E",1],["C",2]]
+  ]
+}
+];
+
+let ctx = null, dry = null, wet = null;
+
+function buildReverb(c){
+  const len = Math.floor(c.sampleRate * 1.9);
+  const buf = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++){
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++){
+      const t = i / len;
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (i < 250 ? i / 250 : 1);
+    }
+  }
+  const conv = c.createConvolver();
+  conv.buffer = buf;
+  return conv;
+}
+
+function audio(){
+  if (!ctx){
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 4; comp.release.value = .25;
+    comp.connect(ctx.destination);
+    dry = ctx.createGain(); dry.gain.value = .55; dry.connect(comp);
+    const conv = buildReverb(ctx);
+    const damp = ctx.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 3600;
+    wet = ctx.createGain(); wet.gain.value = .2;
+    wet.connect(damp); damp.connect(conv); conv.connect(comp);
+  }
+  if (ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+
+function unlock(){
+  const c = audio();
+  const b = c.createBuffer(1, 1, c.sampleRate);
+  const s = c.createBufferSource();
+  s.buffer = b; s.connect(c.destination); s.start(0);
+}
+["pointerdown","touchstart","click"].forEach(ev =>
+  document.addEventListener(ev, unlock, {once:true, passive:true}));
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && ctx && ctx.state === "suspended") ctx.resume();
+});
+
+const PARTIALS = [[1,1,1],[2,.46,.74],[3,.24,.58],[4,.14,.45],[5,.085,.36],[6,.05,.3],[7,.03,.25],[9,.018,.19]];
+
+function note(freq, at, hold){
+  const c = audio();
+  const ring = 3.1 * Math.pow(300 / freq, .45);
+  const stop = Math.min(ring, Math.max(hold, .28) + 1.1);
+
+  const body = c.createGain();
+  body.gain.setValueAtTime(1, at);
+  body.gain.setValueAtTime(1, at + Math.max(hold, .25));
+  body.gain.exponentialRampToValueAtTime(.0001, at + stop);
+
+  const tone = c.createBiquadFilter();
+  tone.type = "lowpass"; tone.Q.value = .7;
+  tone.frequency.setValueAtTime(Math.min(freq * 9, 11000), at);
+  tone.frequency.exponentialRampToValueAtTime(Math.max(freq * 2.4, 700), at + .8);
+
+  body.connect(tone); tone.connect(dry); tone.connect(wet);
+
+  const nodes = [];
+  PARTIALS.forEach(([mult, amp, decay]) => {
+    const o = c.createOscillator();
+    o.type = "sine";
+    o.frequency.value = freq * mult * (1 + 0.00045 * mult * mult);
+    o.detune.value = (Math.random() - .5) * 4;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(amp * .22, at + .008 + mult * .0012);
+    g.gain.exponentialRampToValueAtTime(.00002, at + ring * decay);
+    o.connect(g); g.connect(body);
+    o.start(at); o.stop(at + stop + .1);
+    nodes.push(o);
+  });
+
+  const nb = c.createBuffer(1, Math.floor(c.sampleRate * .05), c.sampleRate);
+  const nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nd.length, 5);
+  const src = c.createBufferSource(); src.buffer = nb;
+  const nf = c.createBiquadFilter(); nf.type = "bandpass"; nf.frequency.value = freq * 3.5; nf.Q.value = .8;
+  const ng = c.createGain(); ng.gain.value = .05;
+  src.connect(nf); nf.connect(ng); ng.connect(body);
+  src.start(at); nodes.push(src);
+
+  return nodes;
+}
+
+const boardEl = document.getElementById("board");
+const whitesEl = document.getElementById("whites");
+const blacksEl = document.getElementById("blacks");
+const keyEls = {};
+
+WHITE.forEach(w => {
+  const b = document.createElement("button");
+  b.className = "key" + (w.finger ? "" : " mute");
+  b.setAttribute("aria-label", "Note " + w.n);
+  if (w.finger){
+    const f = document.createElement("span");
+    f.className = "finger" + (w.step ? " step" : "");
+    f.textContent = w.finger;
+    b.appendChild(f);
+  }
+  const nm = document.createElement("span");
+  nm.className = "name";
+  nm.textContent = w.n === "C5" ? "C" : w.n;
+  b.appendChild(nm);
+  b.addEventListener("pointerdown", e => { e.preventDefault(); hit(b, w.f); });
+  b.addEventListener("contextmenu", e => e.preventDefault());
+  whitesEl.appendChild(b);
+  w.el = b;
+  if (w.n.length === 1) keyEls[w.n] = b;
+});
+
+BLACK.forEach(bk => {
+  const b = document.createElement("button");
+  b.className = "black";
+  b.setAttribute("aria-label", "Black key");
+  b.addEventListener("pointerdown", e => { e.preventDefault(); hit(b, bk.f); });
+  b.addEventListener("contextmenu", e => e.preventDefault());
+  blacksEl.appendChild(b);
+  bk.el = b;
+});
+
+function layout(){
+  const narrow = Math.min(window.innerWidth, document.documentElement.clientWidth) < 640;
+  const visible = narrow ? 6 : 8;
+  WHITE.forEach((w, i) => { w.el.style.display = i < visible ? "" : "none"; });
+
+  const vh = window.innerHeight || 700;
+  const h = Math.max(132, Math.min(226, Math.round(vh * 0.30)));
+  boardEl.style.height = (h + 10) + "px";
+
+  const unit = 100 / visible;
+  const bw = unit * 0.58;
+  BLACK.forEach(bk => {
+    if (bk.after >= visible - 1){ bk.el.style.display = "none"; return; }
+    bk.el.style.display = "";
+    bk.el.style.width = bw + "%";
+    bk.el.style.left = (unit * (bk.after + 1) - bw / 2) + "%";
+    bk.el.style.height = Math.round(h * 0.58) + "px";
+  });
+}
+layout();
+addEventListener("resize", layout);
+addEventListener("orientationchange", () => setTimeout(layout, 250));
+
+const litTimers = new Map();
+function light(el, ms){
+  clearTimeout(litTimers.get(el));
+  el.classList.remove("on");
+  void el.offsetWidth;
+  el.classList.add("on");
+  litTimers.set(el, setTimeout(() => el.classList.remove("on"), ms));
+}
+
+function hit(el, freq){
+  note(freq, audio().currentTime, .35);
+  light(el, 220);
+}
+
+const songsEl = document.getElementById("songs");
+const stripEl = document.getElementById("strip");
+const tipEl = document.getElementById("tip");
+const tempoEl = document.getElementById("tempo");
+const bpmEl = document.getElementById("bpm");
+const playBtn = document.getElementById("play");
+const playLabel = document.getElementById("playLabel");
+const glyph = document.getElementById("glyph");
+
+let current = SONGS[0], chipEls = [], seq = [];
+let playing = false, timers = [], voices = [];
+
+SONGS.forEach(s => {
+  const b = document.createElement("button");
+  b.className = "song";
+  b.textContent = s.title;
+  b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", () => select(s));
+  songsEl.appendChild(b);
+  s.btn = b;
+});
+
+function select(s){
+  stop();
+  current = s;
+  SONGS.forEach(x => x.btn.setAttribute("aria-pressed", String(x === s)));
+  tipEl.textContent = s.tip;
+  tempoEl.value = s.bpm;
+  bpmEl.textContent = s.bpm;
+  stripEl.innerHTML = "";
+  chipEls = [];
+  stripEl.style.setProperty("--cols", Math.max(...s.phrases.map(p => p.length)));
+  s.phrases.forEach(ph => {
+    const row = document.createElement("div");
+    row.className = "phrase";
+    ph.forEach(([n]) => {
+      const c = document.createElement("div");
+      c.className = "chip";
+      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>";
+      row.appendChild(c);
+      chipEls.push(c);
+    });
+    stripEl.appendChild(row);
+  });
+  seq = s.phrases.flat();
+}
+
+tempoEl.addEventListener("input", () => { bpmEl.textContent = tempoEl.value; });
+
+let mode = "stopped", cursor = 0, t0 = 0, marks = [];
+const restartBtn = document.getElementById("restart");
+
+function killVoices(){
+  timers.forEach(clearTimeout); timers = [];
+  litTimers.forEach(clearTimeout); litTimers.clear();
+  voices.forEach(o => { try { o.stop(); } catch(e){} }); voices = [];
+}
+
+function clearHighlights(){
+  chipEls.forEach(c => c.classList.remove("on"));
+  Object.values(keyEls).forEach(k => k.classList.remove("on"));
+}
+
+function setMode(m){
+  mode = m;
+  playing = m === "playing";
+  playBtn.classList.toggle("playing", playing);
+  glyph.textContent = playing ? "❚❚" : "▶";
+  playLabel.textContent = playing ? "Pause" : (m === "paused" ? "Resume" : "Play");
+}
+
+function stop(){
+  killVoices();
+  clearHighlights();
+  cursor = 0;
+  setMode("stopped");
+}
+
+function pause(){
+  const elapsed = ctx ? ctx.currentTime - t0 : 0;
+  let idx = cursor;
+  for (const m of marks){ if (m.at <= elapsed) idx = m.i; else break; }
+  killVoices();
+  cursor = idx;
+  setMode("paused");
+}
+
+function start(){
+  const c = audio();
+  const beat = 60 / Number(tempoEl.value);
+  t0 = c.currentTime + .2;
+  marks = [];
+  let t = 0;
+  for (let i = cursor; i < seq.length; i++){
+    const [n, beats] = seq[i];
+    const dur = beats * beat;
+    marks.push({i:i, at:t});
+    voices.push(...note(FREQ[n], t0 + t, dur * .92));
+    const ms = dur * 1000;
+    const lit = Math.max(70, Math.min(ms - 60, ms * .72));
+    timers.push(setTimeout(() => {
+      chipEls.forEach(x => x.classList.remove("on"));
+      chipEls[i].classList.add("on");
+      light(keyEls[n], lit);
+    }, (t0 + t - c.currentTime) * 1000));
+    t += dur;
+  }
+  timers.push(setTimeout(() => {
+    clearHighlights();
+    cursor = 0;
+    setMode("stopped");
+  }, (t0 + t - c.currentTime) * 1000 + 500));
+  setMode("playing");
+}
+
+function toggle(){ mode === "playing" ? pause() : start(); }
+
+playBtn.addEventListener("click", toggle);
+restartBtn.addEventListener("click", () => {
+  const wasPlaying = mode === "playing";
+  killVoices();
+  clearHighlights();
+  cursor = 0;
+  if (wasPlaying) start(); else setMode("stopped");
+});
+
+const KEYMAP = {"1":"C","2":"D","3":"E","4":"F","5":"G","6":"A",
+                "a":"C","s":"D","d":"E","f":"F","g":"G","h":"A",
+                "ф":"C","ы":"D","в":"E","а":"F","п":"G","р":"A"};
+document.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  if (e.code === "Space"){ e.preventDefault(); toggle(); return; }
+  const n = KEYMAP[e.key.toLowerCase()];
+  if (n) hit(keyEls[n], FREQ[n]);
+});
+
+select(SONGS[0]);
+</script></body></html>
