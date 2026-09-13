@@ -62,6 +62,13 @@ button{font-family:inherit;touch-action:manipulation}
 .chip.on{background:var(--gold);border-color:var(--gold)}
 .chip.on b{color:#2A1B00}
 .chip.on span{color:#6A4A05}
+.chip .word{display:block;font-family:var(--display);font-weight:700;font-size:clamp(9px,2.1vw,13px);color:var(--snow);margin-top:4px;line-height:1.15;overflow-wrap:anywhere;hyphens:manual}
+.chip.on .word{color:#B3201A}
+
+.snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.snow i{position:absolute;top:-24px;color:#fff;font-style:normal;animation:fall linear infinite;will-change:transform}
+@keyframes fall{to{transform:translate3d(var(--dx,0px),110vh,0) rotate(var(--r,180deg))}}
+.wrap{position:relative;z-index:1}
 
 .dock{
   position:sticky;bottom:0;margin-top:auto;
@@ -219,6 +226,15 @@ const SONGS = [
   ]
 }
 ];
+
+const LYRICS = {
+  jingle: "Jing-|le|bells|Jing-|le|bells|Jing-|le|all|the|way|Oh|what|fun|it|is|to|ride|in|a|one-|horse|o-|pen|sleigh",
+  twinkle: "Twin-|kle|twin-|kle|lit-|tle|star|How|I|won-|der|what|you|are|Up|a-|bove|the|world|so|high|Like|a|dia-|mond|in|the|sky|Twin-|kle|twin-|kle|lit-|tle|star|How|I|won-|der|what|you|are",
+  row: "Row|row|row|your|boat|Gent-|ly|down|the|stream|Mer-|ri-|ly|mer-|ri-|ly|mer-|ri-|ly|mer-|ri-|ly|Life|is|but|a|dream",
+  frere: "Are|you|sleep-|ing|Are|you|sleep-|ing|Broth-|er|John|Broth-|er|John|Morn-|ing|bells|are|ring-|ing|Morn-|ing|bells|are|ring-|ing|Ding|dang|dong|Ding|dang|dong",
+  rain: "Rain|rain|go|a-|way|Come|a-|gain|an-|oth-|er|day|Rain|rain|go|a-|way|Come|a-|gain|some|day",
+  ram: "A|ram|sam|sam|A|ram|sam|sam|Gu-|li|gu-|li|gu-|li|gu-|li|gu-|li|ram|sam|sam|A|ra-|fiq|A|ra-|fiq|Gu-|li|gu-|li|gu-|li|gu-|li|gu-|li|ram|sam|sam",
+};
 
 let ctx = null, dry = null, wet = null;
 
@@ -415,14 +431,18 @@ function select(s){
   bpmEl.textContent = s.bpm;
   stripEl.innerHTML = "";
   chipEls = [];
-  stripEl.style.setProperty("--cols", Math.max(...s.phrases.map(p => p.length)));
+  const words = (LYRICS[s.id] || "").split("|");
+  let k = 0;
+  const widest = Math.max(...s.phrases.map(p => p.length));
   s.phrases.forEach(ph => {
     const row = document.createElement("div");
     row.className = "phrase";
+    row.style.setProperty("--cols", Math.min(ph.length + 1, widest));
     ph.forEach(([n]) => {
       const c = document.createElement("div");
       c.className = "chip";
-      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>";
+      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>" +
+                    "<span class=\"word\">" + (words[k++] || "") + "</span>";
       row.appendChild(c);
       chipEls.push(c);
     });
@@ -519,6 +539,25 @@ document.addEventListener("keydown", e => {
   const n = KEYMAP[e.key.toLowerCase()];
   if (n) hit(keyEls[n], FREQ[n]);
 });
+
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches){
+  const snow = document.createElement("div");
+  snow.className = "snow";
+  snow.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 28; i++){
+    const f = document.createElement("i");
+    f.textContent = i % 3 ? "\u2744" : "\u2745";
+    f.style.left = (Math.random() * 100).toFixed(2) + "%";
+    f.style.fontSize = (8 + Math.random() * 13).toFixed(1) + "px";
+    f.style.opacity = (.2 + Math.random() * .5).toFixed(2);
+    f.style.setProperty("--dx", (Math.random() * 90 - 45).toFixed(0) + "px");
+    f.style.setProperty("--r", (Math.random() * 540 - 270).toFixed(0) + "deg");
+    f.style.animationDuration = (8 + Math.random() * 10).toFixed(1) + "s";
+    f.style.animationDelay = (-Math.random() * 18).toFixed(1) + "s";
+    snow.appendChild(f);
+  }
+  document.body.appendChild(snow);
+}
 
 select(SONGS[0]);
 </script></body></html>
