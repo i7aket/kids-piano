@@ -42,6 +42,13 @@ button{font-family:inherit;touch-action:manipulation}
   border-radius:999px;padding:10px 15px;font-size:14.5px;font-weight:600;cursor:pointer;
 }
 .song[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#0A2A21}
+@media (max-width:640px){
+  /* one swipeable row instead of a stack of wrapped buttons */
+  .songs{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px 14px;padding:0 16px 6px;
+    scroll-snap-type:x proximity;scroll-padding:0 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .songs::-webkit-scrollbar{display:none}
+  .song{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start}
+}
 
 .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .play{
@@ -144,7 +151,7 @@ button{font-family:inherit;touch-action:manipulation}
       <div class="whites" id="whites"></div>
       <div id="blacks"></div>
     </div>
-    <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>8</kbd> or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd>. Space starts and stops the melody.</p>
+    <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>8</kbd> (low keys <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd>) or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd>. Space starts and stops the melody.</p>
     <p class="hint touch">You can press several keys at once. If there is no sound, make sure your phone is not in silent mode.</p>
   </div>
 
@@ -152,116 +159,126 @@ button{font-family:inherit;touch-action:manipulation}
 
 <script>
 const WHITE = [
-  {n:"C",  f:261.63, finger:"1"},
-  {n:"D",  f:293.66, finger:"2"},
-  {n:"E",  f:329.63, finger:"3"},
-  {n:"F",  f:349.23, finger:"4"},
-  {n:"G",  f:392.00, finger:"5"},
-  {n:"A",  f:440.00, finger:"5", step:true},
-  {n:"B",  f:493.88, finger:"5", step:true},
+  {n:"G3", f:196.00, finger:"1", step:true},
+  {n:"A3", f:220.00, finger:"1", step:true},
+  {n:"B3", f:246.94, finger:"1", step:true},
+  {n:"C4", f:261.63, finger:"1"},
+  {n:"D4", f:293.66, finger:"2"},
+  {n:"E4", f:329.63, finger:"3"},
+  {n:"F4", f:349.23, finger:"4"},
+  {n:"G4", f:392.00, finger:"5"},
+  {n:"A4", f:440.00, finger:"5", step:true},
+  {n:"B4", f:493.88, finger:"5", step:true},
   {n:"C5", f:523.25, finger:"5", step:true}
 ];
+// black keys sit after the white key with this index; only Bb4 is ever written in a song
 const BLACK = [
-  {after:0, f:277.18},{after:1, f:311.13},
-  {after:3, f:369.99},{after:4, f:415.30},{after:5, f:466.16}
+  {after:0, f:207.65},{after:1, f:233.08},
+  {after:3, f:277.18},{after:4, f:311.13},
+  {after:6, f:369.99},{after:7, f:415.30},{after:8, f:466.16, n:"Bb4"}
 ];
-const FREQ = {}; WHITE.forEach(w => { if (w.n.length === 1) FREQ[w.n] = w.f; });
-FREQ.C5 = 523.25; FREQ.Bb = 466.16;
-const FINGER = {C:"1", D:"2", E:"3", F:"4", G:"5", A:"5", Bb:"5", B:"5", C5:"5"};
-const LABEL = {C5:"C", Bb:"B\u266D"};
-// how many white keys a note needs on screen (B flat sits between A and B)
-const NEED = {C:1, D:2, E:3, F:4, G:5, A:6, Bb:7, B:7, C5:8};
+const IDX = {}; WHITE.forEach((w, i) => IDX[w.n] = i);
+const FREQ = {Bb4:466.16}; WHITE.forEach(w => FREQ[w.n] = w.f);
+const FINGER = {}; WHITE.forEach(w => FINGER[w.n] = w.finger); FINGER.Bb4 = "5";
+// chip label: letter, with an arrow for notes outside the C4..B4 hand position
+function label(n){
+  if (n === "Bb4") return "B\u266D";
+  const letter = n[0];
+  return n.endsWith("3") ? letter + "\u2193" : n === "C5" ? "C\u2191" : letter;
+}
+// which white keys a note needs on screen (Bb4 needs both its neighbours)
+function span(n){ return n === "Bb4" ? [IDX.A4, IDX.B4] : [IDX[n], IDX[n]]; }
 
 const SONGS = [
 {
   id:"birthday", title:"Happy Birthday", bpm:92,
   tip:"Wider than five fingers: the pinky steps up to A, B flat and the high C.",
   phrases:[
-    [["C",.5],["C",.5],["D",1],["C",1],["F",1],["E",2]],
-    [["C",.5],["C",.5],["D",1],["C",1],["G",1],["F",2]],
-    [["C",.5],["C",.5],["C5",1],["A",1],["F",1],["E",2]],
-    [["Bb",.5],["Bb",.5],["A",1],["F",1],["G",1],["F",2]]
+    [["C4",.5],["C4",.5],["D4",1],["C4",1],["F4",1],["E4",2]],
+    [["C4",.5],["C4",.5],["D4",1],["C4",1],["G4",1],["F4",2]],
+    [["C4",.5],["C4",.5],["C5",1],["A4",1],["F4",1],["E4",2]],
+    [["Bb4",.5],["Bb4",.5],["A4",1],["F4",1],["G4",1],["F4",2]]
   ]
 },
 {
   id:"snowflake", title:"Snowflake, Snowflake", bpm:88,
   tip:"Slow and gentle. The pinky steps to A once in the first and third lines.",
   phrases:[
-    [["G",1],["E",1],["G",1],["E",1],["A",.5],["G",.5],["E",1],["D",2]],
-    [["C",.5],["D",.5],["E",1],["E",1],["F",1],["E",1],["D",.5],["D",.5],["C",2]],
-    [["G",1],["E",1],["G",1],["E",1],["A",.5],["G",.5],["E",1],["D",2]],
-    [["G",1],["F",1],["E",1],["D",1],["E",1],["D",1],["C",2]]
+    [["G4",1],["E4",1],["G4",1],["E4",1],["A4",.5],["G4",.5],["E4",1],["D4",2]],
+    [["C4",.5],["D4",.5],["E4",1],["E4",1],["F4",1],["E4",1],["D4",.5],["D4",.5],["C4",2]],
+    [["G4",1],["E4",1],["G4",1],["E4",1],["A4",.5],["G4",.5],["E4",1],["D4",2]],
+    [["G4",1],["F4",1],["E4",1],["D4",1],["E4",1],["D4",1],["C4",2]]
   ]
 },
 {
   id:"jingle", title:"Jingle Bells", bpm:96,
   tip:"The whole melody fits in five fingers, the hand never moves.",
   phrases:[
-    [["E",1],["E",1],["E",2]],
-    [["E",1],["E",1],["E",2]],
-    [["E",1],["G",1],["C",1.5],["D",.5],["E",4]],
-    [["F",1],["F",1],["F",1.5],["F",.5],["F",1],["E",1],["E",1],["E",.5]],
-    [["E",.5],["D",1],["D",1],["E",1],["D",2],["G",2]]
+    [["E4",1],["E4",1],["E4",2]],
+    [["E4",1],["E4",1],["E4",2]],
+    [["E4",1],["G4",1],["C4",1.5],["D4",.5],["E4",4]],
+    [["F4",1],["F4",1],["F4",1.5],["F4",.5],["F4",1],["E4",1],["E4",1],["E4",.5]],
+    [["E4",.5],["D4",1],["D4",1],["E4",1],["D4",2],["G4",2]]
   ]
 },
 {
   id:"twinkle", title:"Twinkle Twinkle Little Star", bpm:88,
   tip:"On the note A the pinky steps right and comes straight back to G.",
   phrases:[
-    [["C",1],["C",1],["G",1],["G",1],["A",1],["A",1],["G",2]],
-    [["F",1],["F",1],["E",1],["E",1],["D",1],["D",1],["C",2]],
-    [["G",1],["G",1],["F",1],["F",1],["E",1],["E",1],["D",2]],
-    [["G",1],["G",1],["F",1],["F",1],["E",1],["E",1],["D",2]],
-    [["C",1],["C",1],["G",1],["G",1],["A",1],["A",1],["G",2]],
-    [["F",1],["F",1],["E",1],["E",1],["D",1],["D",1],["C",2]]
+    [["C4",1],["C4",1],["G4",1],["G4",1],["A4",1],["A4",1],["G4",2]],
+    [["F4",1],["F4",1],["E4",1],["E4",1],["D4",1],["D4",1],["C4",2]],
+    [["G4",1],["G4",1],["F4",1],["F4",1],["E4",1],["E4",1],["D4",2]],
+    [["G4",1],["G4",1],["F4",1],["F4",1],["E4",1],["E4",1],["D4",2]],
+    [["C4",1],["C4",1],["G4",1],["G4",1],["A4",1],["A4",1],["G4",2]],
+    [["F4",1],["F4",1],["E4",1],["E4",1],["D4",1],["D4",1],["C4",2]]
   ]
 },
 {
   id:"row", title:"Row, Row, Row Your Boat", bpm:100,
-  tip:"The third line is fast, so learn it separately and slowly.",
+  tip:"The third line starts on the high C and runs down fast, so learn it slowly.",
   phrases:[
-    [["C",1],["C",1],["C",.67],["D",.33],["E",1]],
-    [["E",.67],["D",.33],["E",.67],["F",.33],["G",2]],
-    [["C",.33],["C",.33],["C",.34],["G",.33],["G",.33],["G",.34],["E",.33],["E",.33],["E",.34],["C",.33],["C",.33],["C",.34]],
-    [["G",.67],["F",.33],["E",.67],["D",.33],["C",2]]
+    [["C4",1],["C4",1],["C4",.67],["D4",.33],["E4",1]],
+    [["E4",.67],["D4",.33],["E4",.67],["F4",.33],["G4",2]],
+    [["C5",.33],["C5",.33],["C5",.34],["G4",.33],["G4",.33],["G4",.34],["E4",.33],["E4",.33],["E4",.34],["C4",.33],["C4",.33],["C4",.34]],
+    [["G4",.67],["F4",.33],["E4",.67],["D4",.33],["C4",2]]
   ]
 },
 {
   id:"frere", title:"Are You Sleeping, Brother John", bpm:100,
-  tip:"The first two lines are the same, and so are the third and fourth, so it is quick to memorize.",
+  tip:"Lines repeat in pairs. On \"dang\" the thumb reaches down to the low G.",
   phrases:[
-    [["C",1],["D",1],["E",1],["C",1]],
-    [["C",1],["D",1],["E",1],["C",1]],
-    [["E",1],["F",1],["G",2]],
-    [["E",1],["F",1],["G",2]],
-    [["G",.5],["A",.5],["G",.5],["F",.5],["E",1],["C",1]],
-    [["G",.5],["A",.5],["G",.5],["F",.5],["E",1],["C",1]],
-    [["C",1],["G",1],["C",2]],
-    [["C",1],["G",1],["C",2]]
+    [["C4",1],["D4",1],["E4",1],["C4",1]],
+    [["C4",1],["D4",1],["E4",1],["C4",1]],
+    [["E4",1],["F4",1],["G4",2]],
+    [["E4",1],["F4",1],["G4",2]],
+    [["G4",.5],["A4",.5],["G4",.5],["F4",.5],["E4",1],["C4",1]],
+    [["G4",.5],["A4",.5],["G4",.5],["F4",.5],["E4",1],["C4",1]],
+    [["C4",1],["G3",1],["C4",2]],
+    [["C4",1],["G3",1],["C4",2]]
   ]
 },
 {
   id:"rain", title:"Rain, Rain, Go Away", bpm:104,
   tip:"The shortest song, a good first one to learn by heart.",
   phrases:[
-    [["G",1],["E",1],["G",1],["G",1],["E",1]],
-    [["G",.5],["G",.5],["E",1],["A",1],["G",.5],["G",.5],["E",1]],
-    [["F",1],["D",1],["F",1],["F",1],["D",1]],
-    [["G",1],["F",1],["E",1],["D",1],["C",2]]
+    [["G4",1],["E4",1],["G4",1],["G4",1],["E4",1]],
+    [["G4",.5],["G4",.5],["E4",1],["A4",1],["G4",.5],["G4",.5],["E4",1]],
+    [["G4",1],["E4",1],["G4",1],["G4",1],["E4",1]],
+    [["G4",1],["F4",1],["E4",1],["D4",1],["C4",2]]
   ]
 },
 {
   id:"ram", title:"A Ram Sam Sam", bpm:112,
   tip:"A simplified version: the song has no single melody and is sung in many ways.",
   phrases:[
-    [["C",1],["C",1],["C",1],["C",1]],
-    [["C",1],["C",1],["C",1],["C",1]],
-    [["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5]],
-    [["E",1],["E",1],["C",2]],
-    [["A",1],["A",1],["A",2]],
-    [["A",1],["A",1],["A",2]],
-    [["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5],["G",.5]],
-    [["E",1],["E",1],["C",2]]
+    [["C4",1],["C4",1],["C4",1],["C4",1]],
+    [["C4",1],["C4",1],["C4",1],["C4",1]],
+    [["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5]],
+    [["E4",1],["E4",1],["C4",2]],
+    [["A4",1],["A4",1],["A4",2]],
+    [["A4",1],["A4",1],["A4",2]],
+    [["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5],["G4",.5]],
+    [["E4",1],["E4",1],["C4",2]]
   ]
 }
 ];
@@ -436,7 +453,7 @@ WHITE.forEach(w => {
   }
   const nm = document.createElement("span");
   nm.className = "name";
-  nm.textContent = w.n === "C5" ? "C" : w.n;
+  nm.textContent = w.n[0];
   b.appendChild(nm);
   b.addEventListener("pointerdown", e => { e.preventDefault(); hit(b, w.f); });
   b.addEventListener("contextmenu", e => e.preventDefault());
@@ -453,14 +470,16 @@ BLACK.forEach(bk => {
   b.addEventListener("contextmenu", e => e.preventDefault());
   blacksEl.appendChild(b);
   bk.el = b;
-  if (bk.after === 5) keyEls.Bb = b;
+  if (bk.n) keyEls[bk.n] = b;
 });
 
-let needKeys = 6;
+let lo = IDX.C4, hi = IDX.A4;   // set per song in select()
 function layout(){
   const narrow = Math.min(window.innerWidth, document.documentElement.clientWidth) < 640;
-  const visible = Math.max(needKeys, narrow ? 6 : 8);
-  WHITE.forEach((w, i) => { w.el.style.display = i < visible ? "" : "none"; });
+  const from = narrow ? lo : Math.min(lo, IDX.C4);
+  const to = narrow ? hi : Math.max(hi, IDX.C5);
+  const visible = to - from + 1;
+  WHITE.forEach((w, i) => { w.el.style.display = i >= from && i <= to ? "" : "none"; });
 
   const vh = window.innerHeight || 700;
   const h = Math.max(132, Math.min(226, Math.round(vh * 0.30)));
@@ -469,10 +488,10 @@ function layout(){
   const unit = 100 / visible;
   const bw = unit * 0.58;
   BLACK.forEach(bk => {
-    if (bk.after >= visible - 1){ bk.el.style.display = "none"; return; }
+    if (bk.after < from || bk.after >= to){ bk.el.style.display = "none"; return; }
     bk.el.style.display = "";
     bk.el.style.width = bw + "%";
-    bk.el.style.left = (unit * (bk.after + 1) - bw / 2) + "%";
+    bk.el.style.left = (unit * (bk.after + 1 - from) - bw / 2) + "%";
     bk.el.style.height = Math.round(h * 0.58) + "px";
   });
 }
@@ -520,6 +539,8 @@ function select(s){
   stop();
   current = s;
   SONGS.forEach(x => x.btn.setAttribute("aria-pressed", String(x === s)));
+  if (songsEl.scrollWidth > songsEl.clientWidth)
+    songsEl.scrollTo({left: s.btn.offsetLeft, behavior: "smooth"});
   tipEl.textContent = s.tip;
   tempoEl.value = s.bpm;
   bpmEl.textContent = s.bpm;
@@ -535,7 +556,7 @@ function select(s){
     ph.forEach(([n]) => {
       const c = document.createElement("div");
       c.className = "chip";
-      c.innerHTML = "<b>" + (LABEL[n] || n) + "</b><span>" + FINGER[n] + "</span>";
+      c.innerHTML = "<b>" + label(n) + "</b><span>" + FINGER[n] + "</span>";
       row.appendChild(c);
       chipEls.push(c);
     });
@@ -564,7 +585,8 @@ function select(s){
     lineEls.push(line);
   });
   seq = s.phrases.flat();
-  needKeys = Math.max(6, ...seq.map(([n]) => NEED[n]));
+  lo = IDX.C4; hi = IDX.A4;
+  seq.forEach(([n]) => { const [x, y] = span(n); lo = Math.min(lo, x); hi = Math.max(hi, y); });
   const used = new Set(seq.map(([n]) => n));
   WHITE.forEach(w => w.el.classList.toggle("mute", !used.has(w.n)));
   layout();
@@ -679,10 +701,10 @@ restartBtn.addEventListener("click", () => {
   if (wasPlaying) start(); else setMode("stopped");
 });
 
-const KEYMAP = {"1":"C","2":"D","3":"E","4":"F","5":"G","6":"A",
-                "7":"B","8":"C5",
-                "a":"C","s":"D","d":"E","f":"F","g":"G","h":"A","j":"B","k":"C5",
-                "ф":"C","ы":"D","в":"E","а":"F","п":"G","р":"A"};
+const KEYMAP = {"1":"C4","2":"D4","3":"E4","4":"F4","5":"G4","6":"A4","7":"B4","8":"C5",
+                "a":"C4","s":"D4","d":"E4","f":"F4","g":"G4","h":"A4","j":"B4","k":"C5",
+                "q":"G3","w":"A3","e":"B3",
+                "ф":"C4","ы":"D4","в":"E4","а":"F4","п":"G4","р":"A4","о":"B4","л":"C5"};
 document.addEventListener("keydown", e => {
   if (e.repeat) return;
   if (e.code === "Space"){ e.preventDefault(); toggle(); return; }
