@@ -95,13 +95,16 @@ button{font-family:inherit;touch-action:manipulation}
   background:linear-gradient(to top,var(--night) 76%,rgba(14,30,60,0));
   padding:14px 0 calc(10px + env(safe-area-inset-bottom));
 }
-.board{position:relative;border-radius:14px;background:#060F22;padding:10px 10px 0}
+.board{border-radius:14px;background:#060F22;padding:10px 10px 0;overflow-x:auto;scrollbar-width:none;
+  scroll-behavior:smooth}
+.board::-webkit-scrollbar{display:none}
+.keys{position:relative;width:max-content;min-width:100%;height:100%}
 .whites{display:flex;gap:0;height:100%}
 .key{
-  flex:1;min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
+  flex:1 0 50px;min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
   cursor:pointer;border-radius:0 0 10px 10px;background:var(--snow);
   display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;
-  touch-action:none;transition:background .05s linear,transform .05s linear;
+  touch-action:pan-x;transition:background .05s linear,transform .05s linear;
 }
 .key.mute{background:#CFD9EA}
 .key.on{background:var(--gold);transform:translateY(3px)}
@@ -113,10 +116,10 @@ button{font-family:inherit;touch-action:manipulation}
 .finger.step{box-shadow:0 0 0 2px var(--mint)}
 .name{font-family:var(--display);font-weight:700;font-size:clamp(14px,3.6vw,17px);color:#12213D}
 .key.mute .name{color:#5F7091}
-#blacks{position:absolute;top:10px;left:10px;right:10px;height:0}
+#blacks{position:absolute;top:0;left:0;right:0;height:0}
 .black{
   position:absolute;top:0;border:none;background:#0A1730;border-radius:0 0 8px 8px;
-  cursor:pointer;touch-action:none;transition:background .05s linear;
+  cursor:pointer;touch-action:pan-x;transition:background .05s linear;
 }
 .black.on{background:var(--mint)}
 
@@ -148,8 +151,10 @@ button{font-family:inherit;touch-action:manipulation}
 
   <div class="dock">
     <div class="board" id="board">
-      <div class="whites" id="whites"></div>
-      <div id="blacks"></div>
+      <div class="keys">
+        <div class="whites" id="whites"></div>
+        <div id="blacks"></div>
+      </div>
     </div>
     <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>8</kbd> (low keys <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd>) or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd>. Space starts and stops the melody.</p>
     <p class="hint touch">You can press several keys at once. If there is no sound, make sure your phone is not in silent mode.</p>
@@ -159,6 +164,7 @@ button{font-family:inherit;touch-action:manipulation}
 
 <script>
 const WHITE = [
+  {n:"C3", f:130.81}, {n:"D3", f:146.83}, {n:"E3", f:164.81}, {n:"F3", f:174.61},
   {n:"G3", f:196.00, finger:"1", step:true},
   {n:"A3", f:220.00, finger:"1", step:true},
   {n:"B3", f:246.94, finger:"1", step:true},
@@ -173,18 +179,17 @@ const WHITE = [
 ];
 // black keys sit after the white key with this index; only Bb4 is ever written in a song
 const BLACK = [
-  {after:0, f:207.65},{after:1, f:233.08},
-  {after:3, f:277.18},{after:4, f:311.13},
-  {after:6, f:369.99},{after:7, f:415.30},{after:8, f:466.16, n:"Bb4"}
+  {after:0, f:138.59},{after:1, f:155.56},{after:3, f:185.00},{after:4, f:207.65},{after:5, f:233.08},
+  {after:7, f:277.18},{after:8, f:311.13},{after:10, f:369.99},{after:11, f:415.30},{after:12, f:466.16, n:"Bb4"}
 ];
 const IDX = {}; WHITE.forEach((w, i) => IDX[w.n] = i);
 const FREQ = {Bb4:466.16}; WHITE.forEach(w => FREQ[w.n] = w.f);
-const FINGER = {}; WHITE.forEach(w => FINGER[w.n] = w.finger); FINGER.Bb4 = "5";
+const FINGER = {}; WHITE.forEach(w => FINGER[w.n] = w.finger || ""); FINGER.Bb4 = "5";
 // chip label: letter, with an arrow for notes outside the C4..B4 hand position
 function label(n){
   if (n === "Bb4") return "B\u266D";
   const letter = n[0];
-  return n.endsWith("3") ? letter + "\u2193" : n === "C5" ? "C\u2191" : letter;
+  return n.endsWith("3") ? letter + "\u2193" : n.endsWith("5") ? letter + "\u2191" : letter;
 }
 // which white keys a note needs on screen (Bb4 needs both its neighbours)
 function span(n){ return n === "Bb4" ? [IDX.A4, IDX.B4] : [IDX[n], IDX[n]]; }
@@ -192,12 +197,12 @@ function span(n){ return n === "Bb4" ? [IDX.A4, IDX.B4] : [IDX[n], IDX[n]]; }
 const SONGS = [
 {
   id:"birthday", title:"Happy Birthday", bpm:92,
-  tip:"Wider than five fingers: the pinky steps up to A, B flat and the high C.",
+  tip:"Starts on the low G below middle C. Only the third line jumps up to the high G.",
   phrases:[
-    [["C4",.5],["C4",.5],["D4",1],["C4",1],["F4",1],["E4",2]],
-    [["C4",.5],["C4",.5],["D4",1],["C4",1],["G4",1],["F4",2]],
-    [["C4",.5],["C4",.5],["C5",1],["A4",1],["F4",1],["E4",2]],
-    [["Bb4",.5],["Bb4",.5],["A4",1],["F4",1],["G4",1],["F4",2]]
+    [["G3",.5],["G3",.5],["A3",1],["G3",1],["C4",1],["B3",2]],
+    [["G3",.5],["G3",.5],["A3",1],["G3",1],["D4",1],["C4",2]],
+    [["G3",.5],["G3",.5],["G4",1],["E4",1],["C4",1],["B3",2]],
+    [["F4",.5],["F4",.5],["E4",1],["C4",1],["D4",1],["C4",2]]
   ]
 },
 {
@@ -473,27 +478,26 @@ BLACK.forEach(bk => {
   if (bk.n) keyEls[bk.n] = b;
 });
 
-let lo = IDX.C4, hi = IDX.A4;   // set per song in select()
+let lo = IDX.C4, hi = IDX.A4;   // white-key range of the current song, set in select()
 function layout(){
-  const narrow = Math.min(window.innerWidth, document.documentElement.clientWidth) < 640;
-  const from = narrow ? lo : Math.min(lo, IDX.C4);
-  const to = narrow ? hi : Math.max(hi, IDX.C5);
-  const visible = to - from + 1;
-  WHITE.forEach((w, i) => { w.el.style.display = i >= from && i <= to ? "" : "none"; });
-
   const vh = window.innerHeight || 700;
-  const h = Math.max(132, Math.min(226, Math.round(vh * 0.30)));
+  const h = Math.max(160, Math.min(250, Math.round(vh * 0.32)));
   boardEl.style.height = (h + 10) + "px";
 
-  const unit = 100 / visible;
+  const unit = 100 / WHITE.length;
   const bw = unit * 0.58;
   BLACK.forEach(bk => {
-    if (bk.after < from || bk.after >= to){ bk.el.style.display = "none"; return; }
-    bk.el.style.display = "";
     bk.el.style.width = bw + "%";
-    bk.el.style.left = (unit * (bk.after + 1 - from) - bw / 2) + "%";
+    bk.el.style.left = (unit * (bk.after + 1) - bw / 2) + "%";
     bk.el.style.height = Math.round(h * 0.58) + "px";
   });
+  showRange();
+}
+// centre the keys the song uses when the two octaves do not fit on screen
+function showRange(){
+  const a = WHITE[lo].el, b = WHITE[hi].el;
+  const mid = (a.offsetLeft + b.offsetLeft + b.offsetWidth) / 2;
+  boardEl.scrollLeft = Math.max(0, mid - boardEl.clientWidth / 2);
 }
 layout();
 addEventListener("resize", layout);
