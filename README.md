@@ -8,6 +8,10 @@ every row of notes, and a Web Audio piano. Single HTML file, no build step.
 - Tempo with `-` and `+` buttons, easier than a slider on a phone.
 - The keyboard shows exactly the keys the song uses (never fewer than C to G),
   with one shared key size across songs; unused keys are greyed.
+- Learn mode: the page listens to a real piano through the microphone. The target
+  key blinks, a correct note flashes green and advances, a wrong note lights the
+  key you hit in red and says how many keys to move and in which direction.
+- Tablets and desktops show two or three full octaves; phones show the song's range.
 - Falling snow in the background, skipped under prefers-reduced-motion.
 - Keyboard: `1`-`8` or `A S D F G H J K`, space plays and stops.
 

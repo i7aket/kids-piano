@@ -129,11 +129,25 @@ button{font-family:inherit;touch-action:manipulation}
 }
 .black.on{background:var(--mint)}
 
+/* learn mode: the target key and chip breathe until it is played */
+@keyframes pulse{0%,100%{background:var(--gold)}50%{background:#FCE6AE}}
+.key.target{background:var(--gold);transform:translateY(3px);animation:pulse .9s ease-in-out infinite}
+.black.target{background:var(--gold);animation:pulse .9s ease-in-out infinite}
+.chip.target{background:var(--gold);border-color:var(--gold);animation:pulse .9s ease-in-out infinite}
+.chip.target b{color:#2A1B00}
+.chip.target span{color:#6A4A05}
+.key.miss,.black.miss{background:var(--berry)}
+.key.miss .name{color:#3A0E06}
+.badge{position:absolute;top:6px;transform:translateX(-50%);z-index:3;pointer-events:none;
+  background:var(--night);color:var(--gold);border:1px solid var(--gold);border-radius:999px;
+  padding:2px 9px;font-family:var(--display);font-weight:700;font-size:15px;white-space:nowrap}
+
 .hint{color:var(--dim);font-size:13.5px;line-height:1.6;margin:10px 0 0}
 .hint kbd{font-family:var(--body);font-size:12.5px;font-weight:700;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--snow)}
 @media (pointer:coarse){.hint.desktop{display:none}}
 @media (pointer:fine){.hint.touch{display:none}}
-@media (prefers-reduced-motion:reduce){.key,.chip,.black{transition:none}}
+@media (prefers-reduced-motion:reduce){.key,.chip,.black{transition:none}
+  .key.target,.black.target,.chip.target{animation:none}}
 </style>
 </head>
 <body>
@@ -581,6 +595,13 @@ BLACK.forEach(bk => {
   if (bk.n) keyEls[bk.n] = b;
 });
 
+const ALLKEYS = [...WHITE, ...BLACK];
+const keysEl = document.querySelector(".keys");
+// letter shown to a child: label() without the octave arrows
+function plain(n){ return label(n).replace(/[\u2191\u2193]/, ""); }
+// white-key position of any key, black keys counting as the white one below them
+function whiteIdx(k){ return k.n && IDX[k.n] !== undefined ? IDX[k.n] : k.after; }
+
 let lo = IDX.C4, hi = IDX.G4;   // white-key window of the current song, set in select()
 function songRange(sg){
   let a = IDX.C4, b = IDX.G4;   // never narrower than the five-finger position
@@ -747,11 +768,14 @@ function killVoices(){
 }
 
 function clearHighlights(){
-  chipEls.forEach(c => c.classList.remove("on", "good"));
+  chipEls.forEach(c => c.classList.remove("on", "good", "target"));
   lyricEls.forEach(l => l.classList.remove("on"));
   lineEls.forEach(l => l.classList.remove("now"));
-  Object.values(keyEls).forEach(k => k.classList.remove("on", "good"));
+  ALLKEYS.forEach(k => k.el.classList.remove("on", "good", "target", "miss"));
+  clearTimeout(missTimer);
+  if (badgeEl){ badgeEl.remove(); badgeEl = null; }
 }
+let missTimer = 0, badgeEl = null;
 
 function setMode(m){
   mode = m;
@@ -858,7 +882,7 @@ restartBtn.addEventListener("click", () => {
 // ---------- Learn mode: listen to a real piano and wait for the right note ----------
 const learnBtn = document.getElementById("learn");
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) learnBtn.hidden = true;
-const learn = {on:false, i:0, armed:false, quiet:false, hits:0, noise:0.002,
+const learn = {on:false, i:0, armed:false, quiet:false, hits:0, bad:0, noise:0.002,
                stream:null, src:null, analyser:null, detector:null, buf:null, raf:0, gate:0, hint:0};
 
 function octaveName(n, d){ return n.replace(/\d/, m => String(Number(m) + d)); }
@@ -913,8 +937,8 @@ function learnStop(){
 function showTarget(i){
   const [n] = seq[i];
   clearHighlights();
-  chipEls[i].classList.add("on");
-  keyEls[n].classList.add("on");
+  chipEls[i].classList.add("target");
+  keyEls[n].classList.add("target");
   lyricEls[i].classList.add("on");
   lineEls.forEach(l => l.classList.toggle("now", l === lyricEls[i].closest(".line")));
   keepVisible(i);
@@ -928,13 +952,53 @@ function learnStep(i){
     setTimeout(learnStop, 1500);
     return;
   }
-  learn.i = i; learn.armed = false; learn.quiet = false; learn.hits = 0;
+  learn.i = i; learn.armed = false; learn.quiet = false; learn.hits = 0; learn.bad = 0;
   showTarget(i);
-  tipEl.textContent = "Play the " + label(seq[i][0]).replace(/[\u2191\u2193]/, "") + " key on your piano.";
+  tipEl.textContent = askTip(i);
   const play = () => note(FREQ[seq[i][0]], audio().currentTime, .5);
   play();
   learn.gate = setTimeout(() => { learn.armed = true; }, 1200);   // let our own note ring out first
-  learn.hint = setInterval(() => { play(); light(keyEls[seq[i][0]], 400); setTimeout(() => keyEls[seq[i][0]].classList.add("on"), 420); }, 6000);
+  learn.hint = setInterval(play, 6000);
+}
+
+function askTip(i){ return "Play the " + plain(seq[i][0]) + " key on your piano."; }
+
+// one wrong note -> one hint: colour the key that was played, say how far it is
+function learnMiss(hz){
+  const i = learn.i, tgt = seq[i][0];
+  learn.hits = 0; learn.bad = 0;
+  learn.armed = false; learn.quiet = false;
+  learn.gate = setTimeout(() => { learn.armed = true; }, 700);
+
+  let best = null, bd = Infinity;
+  ALLKEYS.forEach(k => { const d = Math.abs(1200 * Math.log2(hz / k.f)); if (d < bd){ bd = d; best = k; } });
+
+  if (bd > 50){                                   // outside C3..C6, no key to blame
+    tipEl.textContent = hz < best.f ? "Too low. Move to the right \u2192" : "Too high. Move to the left \u2190";
+  } else {
+    best.el.classList.add("miss");
+    const d = whiteIdx(ALLKEYS.find(k => k.n === tgt)) - whiteIdx(best);  // + means the target is to the right
+    const heard = best.n ? plain(best.n) : plain(WHITE[best.after].n) + "\u266F";
+    const want = plain(tgt);
+    const keys = Math.abs(d) === 1 ? "1 key" : Math.abs(d) + " keys";
+    const way = d > 0 ? "right \u2192" : "left \u2190";
+    tipEl.textContent = !d ? "That was " + heard + ". The " + want + " is the white key just below it."
+      : heard === want ? "That was a " + heard + ", but a " + (d > 0 ? "lower" : "higher") + " one. Go " + keys + " to the " + way
+      : "That was " + heard + ". The " + want + " is " + keys + " to the " + way;
+    if (d){
+      badgeEl = document.createElement("div");
+      badgeEl.className = "badge";
+      badgeEl.textContent = d > 0 ? "\u2192 " + Math.abs(d) : Math.abs(d) + " \u2190";
+      keysEl.appendChild(badgeEl);
+      const t = keyEls[tgt];
+      badgeEl.style.left = (t.offsetLeft + t.offsetWidth / 2) + "px";
+    }
+  }
+  missTimer = setTimeout(() => {
+    if (badgeEl){ badgeEl.remove(); badgeEl = null; }
+    if (best) best.el.classList.remove("miss");
+    if (learn.on && learn.i === i) tipEl.textContent = askTip(i);
+  }, 900);
 }
 
 function learnFrame(){
@@ -949,14 +1013,18 @@ function learnFrame(){
   if (rms < quietLevel) learn.quiet = true;   // a gap must separate notes, so repeated notes count
   if (learn.armed && learn.quiet && rms > loudLevel){
     const [hz, clarity] = learn.detector.findPitch(learn.buf, ctx.sampleRate);
-    learn.hits = (clarity > 0.9 && matches(hz, seq[learn.i][0])) ? learn.hits + 1 : 0;
-    if (learn.hits >= 3){
+    const right = clarity > 0.9 && matches(hz, seq[learn.i][0]);
+    learn.hits = right ? learn.hits + 1 : 0;
+    learn.bad = (clarity > 0.9 && !right) ? learn.bad + 1 : 0;
+    if (learn.bad >= 3) learnMiss(hz);
+    else if (learn.hits >= 3){
       learn.armed = false; learn.hits = 0;
       const i = learn.i, n = seq[i][0];
+      chipEls[i].classList.remove("target"); keyEls[n].classList.remove("target");
       chipEls[i].classList.add("good"); keyEls[n].classList.add("good");
       setTimeout(() => { chipEls[i].classList.remove("good"); keyEls[n].classList.remove("good"); if (learn.on) learnStep(i + 1); }, 450);
     }
-  } else if (!learn.armed) learn.hits = 0;
+  } else if (!learn.armed){ learn.hits = 0; learn.bad = 0; }
   learn.raf = requestAnimationFrame(learnFrame);
 }
 
