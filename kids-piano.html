@@ -171,6 +171,7 @@ button{font-family:inherit;touch-action:manipulation}
     </div>
   </div>
   <p class="tip" id="tip"></p>
+  <p class="tip" id="debug" hidden style="font-family:monospace;font-size:12px;margin-top:-10px"></p>
 
   <div class="strip" id="strip"></div>
 
@@ -881,6 +882,8 @@ restartBtn.addEventListener("click", () => {
 
 // ---------- Learn mode: listen to a real piano and wait for the right note ----------
 const learnBtn = document.getElementById("learn");
+const debugEl = location.hash.includes("debug") ? document.getElementById("debug") : null;
+if (debugEl) debugEl.hidden = false;
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) learnBtn.hidden = true;
 const learn = {on:false, i:0, armed:false, quiet:false, hits:0, bad:0, noise:0.002,
                stream:null, src:null, analyser:null, detector:null, buf:null, raf:0, gate:0, hint:0};
@@ -1009,6 +1012,13 @@ function learnFrame(){
   // ponytail: crude adaptive noise floor (slow-rising minimum); replace with a real
   // level meter if phones with aggressive auto-gain never look "quiet"
   learn.noise = rms < learn.noise ? rms : learn.noise * 0.999 + rms * 0.001;
+  if (debugEl){   // #debug in the URL: live readout for tuning on a real piano
+    const [dhz, dcl] = rms > 0.003 ? learn.detector.findPitch(learn.buf, ctx.sampleRate) : [0, 0];
+    const midi = dhz > 0 ? Math.round(69 + 12 * Math.log2(dhz / 440)) : null;
+    const name = midi === null ? "-" : ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][midi % 12] + (Math.floor(midi / 12) - 1);
+    debugEl.textContent = "rms " + rms.toFixed(3) + " noise " + learn.noise.toFixed(3) + " | " + Math.round(dhz) + " Hz " + name +
+      " clarity " + dcl.toFixed(2) + " | armed " + learn.armed + " quiet " + learn.quiet + " hits " + learn.hits + " bad " + learn.bad;
+  }
   const quietLevel = learn.noise * 2 + 0.002, loudLevel = learn.noise * 4 + 0.006;
   if (rms < quietLevel) learn.quiet = true;   // a gap must separate notes, so repeated notes count
   if (learn.armed && learn.quiet && rms > loudLevel){
