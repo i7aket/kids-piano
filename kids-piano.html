@@ -100,14 +100,14 @@ button{font-family:inherit;touch-action:manipulation}
   background:linear-gradient(to top,var(--night) 76%,rgba(14,30,60,0));
   padding:14px 0 calc(10px + env(safe-area-inset-bottom));
 }
-.board{border-radius:14px;background:#060F22;padding:10px 10px 0;width:max-content;max-width:100%;margin:0 auto}
+.board{border-radius:14px;background:#060F22;padding:10px 10px 0;max-width:100%;margin:0 auto;box-sizing:content-box}
 @media (min-width:700px){
   .dock{margin-left:calc(50% - 50vw + 16px);margin-right:calc(50% - 50vw + 16px)}
 }
 .keys{position:relative;height:100%}
 .whites{display:flex;gap:0;height:100%}
 .key{
-  flex:0 0 var(--kw,50px);min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
+  flex:0 0 var(--kw,50px);width:var(--kw,50px);min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
   cursor:pointer;border-radius:0 0 10px 10px;background:var(--snow);
   display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;
   touch-action:none;transition:background .05s linear,transform .05s linear;
@@ -626,6 +626,7 @@ function layout(){
   const from = wide ? 0 : lo, to = wide ? count - 1 : hi;
   const kw = wide ? Math.floor(Math.min(64, room / count)) : Math.floor(Math.min(64, room / MAX_KEYS));
   boardEl.style.setProperty("--kw", kw + "px");
+  boardEl.style.width = ((to - from + 1) * kw) + "px";   // explicit: WebKit ignores flex-basis for max-content
 
   WHITE.forEach((w, i) => { w.el.style.display = i >= from && i <= to ? "" : "none"; });
   const bw = kw * 0.58;
