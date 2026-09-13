@@ -36,19 +36,17 @@ body{
 button{font-family:inherit;touch-action:manipulation}
 .wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;min-height:100dvh}
 
-.songs{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:16px;padding-bottom:6px;
-  scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.songbar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.songbar .step{flex:0 0 42px}
+.songs{flex:1;min-width:0;display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;padding:3px 0;
+  scroll-behavior:smooth;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .songs::-webkit-scrollbar{display:none}
 .song{
   background:var(--card);color:var(--snow);border:1px solid var(--line);
   border-radius:999px;padding:10px 15px;font-size:14.5px;font-weight:600;cursor:pointer;
 }
 .song[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#0A2A21}
-.song{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start}
-@media (max-width:640px){
-  /* bleed to the screen edges on phones */
-  .songs{margin:0 -16px 14px;padding:0 16px 6px;scroll-padding:0 16px}
-}
+.song{flex:0 0 auto;white-space:nowrap}
 
 .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 -16px 8px;padding:6px 16px 8px;
   position:sticky;top:0;z-index:2;background:var(--night)}
@@ -133,7 +131,11 @@ button{font-family:inherit;touch-action:manipulation}
 <body>
 <div class="wrap">
 
-  <div class="songs" id="songs"></div>
+  <div class="songbar">
+    <button class="step" id="songsLeft" type="button" aria-label="Scroll songs left">&#8249;</button>
+    <div class="songs" id="songs"></div>
+    <button class="step" id="songsRight" type="button" aria-label="Scroll songs right">&#8250;</button>
+  </div>
 
   <div class="bar">
     <button class="play" id="play"><span id="glyph">▶</span><span id="playLabel">Play</span></button>
@@ -632,16 +634,24 @@ SONGS.forEach(s => {
   s.btn = b;
 });
 
+function revealSong(){
+  if (songsEl.scrollWidth > songsEl.clientWidth)
+    songsEl.scrollTo({left: current.btn.offsetLeft - songsEl.offsetLeft - 8, behavior: "smooth"});
+}
+// button widths change once the web font arrives, so line the row up again then
+if (document.fonts) document.fonts.ready.then(revealSong);
+function scrollSongs(dir){ songsEl.scrollBy({left: dir * songsEl.clientWidth * 0.8, behavior: "smooth"}); }
+document.getElementById("songsLeft").addEventListener("click", () => scrollSongs(-1));
+document.getElementById("songsRight").addEventListener("click", () => scrollSongs(1));
 songsEl.addEventListener("wheel", e => {
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)){ songsEl.scrollLeft += e.deltaY; e.preventDefault(); }
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)){ songsEl.scrollBy({left: e.deltaY, behavior: "instant"}); e.preventDefault(); }
 }, {passive:false});
 
 function select(s){
   stop();
   current = s;
   SONGS.forEach(x => x.btn.setAttribute("aria-pressed", String(x === s)));
-  if (songsEl.scrollWidth > songsEl.clientWidth)
-    songsEl.scrollTo({left: s.btn.offsetLeft - songsEl.offsetLeft, behavior: "smooth"});
+  revealSong();
   tipEl.textContent = s.tip;
   tempoEl.value = s.bpm;
   bpmEl.textContent = s.bpm;
@@ -829,6 +839,10 @@ const KEYMAP = {"1":"C4","2":"D4","3":"E4","4":"F4","5":"G4","6":"A4","7":"B4","
 document.addEventListener("keydown", e => {
   if (e.repeat) return;
   if (e.code === "Space"){ e.preventDefault(); toggle(); return; }
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight"){
+    if (e.target.tagName === "INPUT") return;
+    e.preventDefault(); scrollSongs(e.key === "ArrowRight" ? 1 : -1); return;
+  }
   const n = KEYMAP[e.key.toLowerCase()];
   if (n) hit(keyEls[n], FREQ[n]);
 });
