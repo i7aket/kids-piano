@@ -20,6 +20,7 @@
   --dim:#8FA6CC;
   --line:#2A487A;
   --card:#1B3157;
+  --red:#FF5145;
   --display:"Comfortaa","Trebuchet MS",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,sans-serif;
 }
@@ -62,8 +63,12 @@ button{font-family:inherit;touch-action:manipulation}
 .chip.on{background:var(--gold);border-color:var(--gold)}
 .chip.on b{color:#2A1B00}
 .chip.on span{color:#6A4A05}
-.chip .word{display:block;font-family:var(--display);font-weight:700;font-size:clamp(9px,2.1vw,13px);color:var(--snow);margin-top:4px;line-height:1.15;overflow-wrap:anywhere;hyphens:manual}
-.chip.on .word{color:#B3201A}
+
+.lyrics{margin:0 0 20px;font-family:var(--display);font-weight:700;
+  font-size:clamp(15px,3.9vw,21px);line-height:1.55}
+.lyrics .line{color:#5D769E;transition:color .12s linear}
+.lyrics .line.now{color:var(--snow)}
+.lyrics .syl.on{color:var(--red)}
 
 .snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
 .snow i{position:absolute;top:-24px;color:#fff;font-style:normal;animation:fall linear infinite;will-change:transform}
@@ -123,6 +128,7 @@ button{font-family:inherit;touch-action:manipulation}
   <p class="tip" id="tip"></p>
 
   <div class="strip" id="strip"></div>
+  <div class="lyrics" id="lyrics"></div>
 
   <div class="dock">
     <div class="board" id="board">
@@ -154,6 +160,16 @@ const FREQ = {}; WHITE.forEach(w => { if (w.n.length === 1) FREQ[w.n] = w.f; });
 const FINGER = {C:"1", D:"2", E:"3", F:"4", G:"5", A:"5"};
 
 const SONGS = [
+{
+  id:"snowflake", title:"Snowflake, Snowflake", bpm:88,
+  tip:"Slow and gentle. The pinky steps to A once in the first and third lines.",
+  phrases:[
+    [["G",1],["E",1],["G",1],["E",1],["A",.5],["G",.5],["E",1],["D",2]],
+    [["C",.5],["D",.5],["E",1],["E",1],["F",1],["E",1],["D",.5],["D",.5],["C",2]],
+    [["G",1],["E",1],["G",1],["E",1],["A",.5],["G",.5],["E",1],["D",2]],
+    [["G",1],["F",1],["E",1],["D",1],["E",1],["D",1],["C",2]]
+  ]
+},
 {
   id:"jingle", title:"Jingle Bells", bpm:96,
   tip:"The whole melody fits in five fingers, the hand never moves.",
@@ -228,12 +244,59 @@ const SONGS = [
 ];
 
 const LYRICS = {
-  jingle: "Jing-|le|bells|Jing-|le|bells|Jing-|le|all|the|way|Oh|what|fun|it|is|to|ride|in|a|one-|horse|o-|pen|sleigh",
-  twinkle: "Twin-|kle|twin-|kle|lit-|tle|star|How|I|won-|der|what|you|are|Up|a-|bove|the|world|so|high|Like|a|dia-|mond|in|the|sky|Twin-|kle|twin-|kle|lit-|tle|star|How|I|won-|der|what|you|are",
-  row: "Row|row|row|your|boat|Gent-|ly|down|the|stream|Mer-|ri-|ly|mer-|ri-|ly|mer-|ri-|ly|mer-|ri-|ly|Life|is|but|a|dream",
-  frere: "Are|you|sleep-|ing|Are|you|sleep-|ing|Broth-|er|John|Broth-|er|John|Morn-|ing|bells|are|ring-|ing|Morn-|ing|bells|are|ring-|ing|Ding|dang|dong|Ding|dang|dong",
-  rain: "Rain|rain|go|a-|way|Come|a-|gain|an-|oth-|er|day|Rain|rain|go|a-|way|Come|a-|gain|some|day",
-  ram: "A|ram|sam|sam|A|ram|sam|sam|Gu-|li|gu-|li|gu-|li|gu-|li|gu-|li|ram|sam|sam|A|ra-|fiq|A|ra-|fiq|Gu-|li|gu-|li|gu-|li|gu-|li|gu-|li|ram|sam|sam",
+  "snowflake": [
+    "Snow|flake, snow|flake, lit|tle snow|flake",
+    "Lit|tle snow|flake fall|ing from the sky",
+    "Snow|flake, snow|flake, lit|tle snow|flake",
+    "Fall|ing, fall|ing, fall|ing down"
+  ],
+  "jingle": [
+    "Jing|le bells",
+    "Jing|le bells",
+    "Jing|le all the way",
+    "Oh what fun it is to ride in",
+    "a one-|horse o|pen sleigh"
+  ],
+  "twinkle": [
+    "Twin|kle twin|kle lit|tle star",
+    "How I won|der what you are",
+    "Up a|bove the world so high",
+    "Like a dia|mond in the sky",
+    "Twin|kle twin|kle lit|tle star",
+    "How I won|der what you are"
+  ],
+  "row": [
+    "Row, row, row your boat",
+    "Gent|ly down the stream",
+    "Mer|ri|ly, mer|ri|ly, mer|ri|ly, mer|ri|ly",
+    "Life is but a dream"
+  ],
+  "frere": [
+    "Are you sleep|ing",
+    "Are you sleep|ing",
+    "Broth|er John",
+    "Broth|er John",
+    "Morn|ing bells are ring|ing",
+    "Morn|ing bells are ring|ing",
+    "Ding dang dong",
+    "Ding dang dong"
+  ],
+  "rain": [
+    "Rain, rain, go a|way",
+    "Come a|gain an|oth|er day",
+    "Rain, rain, go a|way",
+    "Come a|gain some day"
+  ],
+  "ram": [
+    "A ram sam sam",
+    "A ram sam sam",
+    "gu|li gu|li gu|li gu|li gu|li",
+    "ram sam sam",
+    "A ra|fiq",
+    "A ra|fiq",
+    "gu|li gu|li gu|li gu|li gu|li",
+    "ram sam sam"
+  ]
 };
 
 let ctx = null, dry = null, wet = null;
@@ -402,6 +465,7 @@ function hit(el, freq){
 
 const songsEl = document.getElementById("songs");
 const stripEl = document.getElementById("strip");
+const lyricsEl = document.getElementById("lyrics");
 const tipEl = document.getElementById("tip");
 const tempoEl = document.getElementById("tempo");
 const bpmEl = document.getElementById("bpm");
@@ -409,7 +473,7 @@ const playBtn = document.getElementById("play");
 const playLabel = document.getElementById("playLabel");
 const glyph = document.getElementById("glyph");
 
-let current = SONGS[0], chipEls = [], seq = [];
+let current = SONGS[0], chipEls = [], lyricEls = [], seq = [];
 let playing = false, timers = [], voices = [];
 
 SONGS.forEach(s => {
@@ -430,23 +494,39 @@ function select(s){
   tempoEl.value = s.bpm;
   bpmEl.textContent = s.bpm;
   stripEl.innerHTML = "";
+  lyricsEl.innerHTML = "";
   chipEls = [];
-  const words = (LYRICS[s.id] || "").split("|");
-  let k = 0;
-  const widest = Math.max(...s.phrases.map(p => p.length));
-  s.phrases.forEach(ph => {
+  lyricEls = [];
+  const lines = LYRICS[s.id] || [];
+  stripEl.style.setProperty("--cols", Math.max(...s.phrases.map(p => p.length)));
+  s.phrases.forEach((ph, pi) => {
     const row = document.createElement("div");
     row.className = "phrase";
-    row.style.setProperty("--cols", Math.min(ph.length + 1, widest));
     ph.forEach(([n]) => {
       const c = document.createElement("div");
       c.className = "chip";
-      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>" +
-                    "<span class=\"word\">" + (words[k++] || "") + "</span>";
+      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>";
       row.appendChild(c);
       chipEls.push(c);
     });
     stripEl.appendChild(row);
+
+    // one lyric line per phrase: words stay whole, each syllable is its own span
+    const line = document.createElement("div");
+    line.className = "line";
+    (lines[pi] || "").split(" ").forEach((word, wi) => {
+      if (wi) line.appendChild(document.createTextNode(" "));
+      const w = document.createElement("span");
+      word.split("|").forEach(syl => {
+        const sp = document.createElement("span");
+        sp.className = "syl";
+        sp.textContent = syl;
+        w.appendChild(sp);
+        lyricEls.push(sp);
+      });
+      line.appendChild(w);
+    });
+    lyricsEl.appendChild(line);
   });
   seq = s.phrases.flat();
 }
@@ -464,6 +544,8 @@ function killVoices(){
 
 function clearHighlights(){
   chipEls.forEach(c => c.classList.remove("on"));
+  lyricEls.forEach(l => l.classList.remove("on"));
+  lyricsEl.querySelectorAll(".line").forEach(l => l.classList.remove("now"));
   Object.values(keyEls).forEach(k => k.classList.remove("on"));
 }
 
@@ -507,6 +589,13 @@ function start(){
     timers.push(setTimeout(() => {
       chipEls.forEach(x => x.classList.remove("on"));
       chipEls[i].classList.add("on");
+      lyricEls.forEach(x => x.classList.remove("on"));
+      const syl = lyricEls[i];
+      if (syl){
+        syl.classList.add("on");
+        const line = syl.closest(".line");
+        lyricsEl.querySelectorAll(".line").forEach(l => l.classList.toggle("now", l === line));
+      }
       light(keyEls[n], lit);
     }, (t0 + t - c.currentTime) * 1000));
     t += dur;
