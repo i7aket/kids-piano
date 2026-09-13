@@ -95,16 +95,14 @@ button{font-family:inherit;touch-action:manipulation}
   background:linear-gradient(to top,var(--night) 76%,rgba(14,30,60,0));
   padding:14px 0 calc(10px + env(safe-area-inset-bottom));
 }
-.board{border-radius:14px;background:#060F22;padding:10px 10px 0;overflow-x:auto;scrollbar-width:none;
-  scroll-behavior:smooth}
-.board::-webkit-scrollbar{display:none}
-.keys{position:relative;width:max-content;min-width:100%;height:100%}
+.board{border-radius:14px;background:#060F22;padding:10px 10px 0;width:max-content;max-width:100%;margin:0 auto}
+.keys{position:relative;height:100%}
 .whites{display:flex;gap:0;height:100%}
 .key{
-  flex:1 0 50px;min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
+  flex:0 0 var(--kw,50px);min-width:0;border:none;border-left:2px solid #060F22;padding:0 0 12px;
   cursor:pointer;border-radius:0 0 10px 10px;background:var(--snow);
   display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;
-  touch-action:pan-x;transition:background .05s linear,transform .05s linear;
+  touch-action:none;transition:background .05s linear,transform .05s linear;
 }
 .key.mute{background:#CFD9EA}
 .key.on{background:var(--gold);transform:translateY(3px)}
@@ -119,7 +117,7 @@ button{font-family:inherit;touch-action:manipulation}
 #blacks{position:absolute;top:0;left:0;right:0;height:0}
 .black{
   position:absolute;top:0;border:none;background:#0A1730;border-radius:0 0 8px 8px;
-  cursor:pointer;touch-action:pan-x;transition:background .05s linear;
+  cursor:pointer;touch-action:none;transition:background .05s linear;
 }
 .black.on{background:var(--mint)}
 
@@ -478,26 +476,34 @@ BLACK.forEach(bk => {
   if (bk.n) keyEls[bk.n] = b;
 });
 
-let lo = IDX.C4, hi = IDX.A4;   // white-key range of the current song, set in select()
+let lo = IDX.C4, hi = IDX.G4;   // white-key window of the current song, set in select()
+function songRange(sg){
+  let a = IDX.C4, b = IDX.G4;   // never narrower than the five-finger position
+  sg.phrases.flat().forEach(([n]) => { const [x, y] = span(n); a = Math.min(a, x); b = Math.max(b, y); });
+  return [a, b];
+}
+// widest window any song needs: every song shares one key width so the keys never change size
+const MAX_KEYS = Math.max(...SONGS.map(sg => { const [a, b] = songRange(sg); return b - a + 1; }));
+
 function layout(){
   const vh = window.innerHeight || 700;
-  const h = Math.max(160, Math.min(250, Math.round(vh * 0.32)));
+  const h = Math.max(150, Math.min(240, Math.round(vh * 0.30)));
   boardEl.style.height = (h + 10) + "px";
 
-  const unit = 100 / WHITE.length;
-  const bw = unit * 0.58;
+  const room = boardEl.parentElement.clientWidth - 20;
+  const kw = Math.floor(Math.min(64, room / MAX_KEYS));
+  boardEl.style.setProperty("--kw", kw + "px");
+
+  const visible = hi - lo + 1;
+  WHITE.forEach((w, i) => { w.el.style.display = i >= lo && i <= hi ? "" : "none"; });
+  const bw = kw * 0.58;
   BLACK.forEach(bk => {
-    bk.el.style.width = bw + "%";
-    bk.el.style.left = (unit * (bk.after + 1) - bw / 2) + "%";
+    if (bk.after < lo || bk.after >= hi){ bk.el.style.display = "none"; return; }
+    bk.el.style.display = "";
+    bk.el.style.width = bw + "px";
+    bk.el.style.left = (kw * (bk.after + 1 - lo) - bw / 2) + "px";
     bk.el.style.height = Math.round(h * 0.58) + "px";
   });
-  showRange();
-}
-// centre the keys the song uses when the two octaves do not fit on screen
-function showRange(){
-  const a = WHITE[lo].el, b = WHITE[hi].el;
-  const mid = (a.offsetLeft + b.offsetLeft + b.offsetWidth) / 2;
-  boardEl.scrollLeft = Math.max(0, mid - boardEl.clientWidth / 2);
 }
 layout();
 addEventListener("resize", layout);
@@ -589,8 +595,7 @@ function select(s){
     lineEls.push(line);
   });
   seq = s.phrases.flat();
-  lo = IDX.C4; hi = IDX.A4;
-  seq.forEach(([n]) => { const [x, y] = span(n); lo = Math.min(lo, x); hi = Math.max(hi, y); });
+  [lo, hi] = songRange(s);
   const used = new Set(seq.map(([n]) => n));
   WHITE.forEach(w => w.el.classList.toggle("mute", !used.has(w.n)));
   layout();
