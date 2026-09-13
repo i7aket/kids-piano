@@ -53,9 +53,15 @@ button{font-family:inherit;touch-action:manipulation}
 .play:focus-visible,.song:focus-visible,.tempo input:focus-visible,.key:focus-visible,.black:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
 .tempo{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:14px}
 .tempo input{width:130px;height:34px;accent-color:var(--mint)}
+.tempo #bpm{min-width:30px;text-align:center;color:var(--snow);font-weight:700}
+.step{width:42px;height:42px;border-radius:50%;background:var(--card);color:var(--snow);
+  border:1px solid var(--line);font-size:22px;line-height:1;cursor:pointer}
+.step:active{background:var(--mint);color:#0A2A21}
+.step:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
+@media (pointer:coarse){.tempo input{display:none}}
 .tip{color:var(--dim);font-size:14.5px;line-height:1.5;margin:0 0 18px}
 
-.strip{display:flex;flex-direction:column;gap:clamp(4px,1vw,8px);margin-bottom:20px}
+.strip{display:flex;flex-direction:column;margin-bottom:20px}
 .phrase{display:grid;grid-template-columns:repeat(var(--cols,8),minmax(0,1fr));gap:clamp(4px,1vw,7px)}
 .chip{min-width:0;padding:clamp(5px,1.4vw,8px) 0 clamp(4px,1.2vw,7px);border-radius:11px;background:var(--card);border:1px solid var(--line);text-align:center}
 .chip b{display:block;font-family:var(--display);font-weight:700;font-size:clamp(13px,3.2vw,20px);line-height:1}
@@ -64,11 +70,11 @@ button{font-family:inherit;touch-action:manipulation}
 .chip.on b{color:#2A1B00}
 .chip.on span{color:#6A4A05}
 
-.lyrics{margin:0 0 20px;font-family:var(--display);font-weight:700;
-  font-size:clamp(15px,3.9vw,21px);line-height:1.55}
-.lyrics .line{color:#5D769E;transition:color .12s linear}
-.lyrics .line.now{color:var(--snow)}
-.lyrics .syl.on{color:var(--red)}
+.line{font-family:var(--display);font-weight:700;font-size:clamp(14px,3.4vw,19px);
+  line-height:1.35;color:#5D769E;padding:4px 2px clamp(9px,2.2vw,15px);
+  transition:color .12s linear}
+.line.now{color:var(--snow)}
+.syl.on{color:var(--red)}
 
 .snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
 .snow i{position:absolute;top:-24px;color:#fff;font-style:normal;animation:fall linear infinite;will-change:transform}
@@ -120,22 +126,23 @@ button{font-family:inherit;touch-action:manipulation}
   <div class="bar">
     <button class="play" id="play"><span id="glyph">▶</span><span id="playLabel">Play</span></button>
     <button class="song" id="restart" type="button">↺ Restart</button>
-    <label class="tempo">Tempo
+    <div class="tempo">Tempo
+      <button class="step" id="slower" type="button" aria-label="Slower">−</button>
       <input type="range" id="tempo" min="50" max="140" value="90" step="2">
       <span id="bpm">90</span>
-    </label>
+      <button class="step" id="faster" type="button" aria-label="Faster">+</button>
+    </div>
   </div>
   <p class="tip" id="tip"></p>
 
   <div class="strip" id="strip"></div>
-  <div class="lyrics" id="lyrics"></div>
 
   <div class="dock">
     <div class="board" id="board">
       <div class="whites" id="whites"></div>
       <div id="blacks"></div>
     </div>
-    <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>6</kbd> or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd>. Space starts and stops the melody.</p>
+    <p class="hint desktop">On a computer: <kbd>1</kbd>–<kbd>8</kbd> or <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd>. Space starts and stops the melody.</p>
     <p class="hint touch">You can press several keys at once. If there is no sound, make sure your phone is not in silent mode.</p>
   </div>
 
@@ -149,17 +156,31 @@ const WHITE = [
   {n:"F",  f:349.23, finger:"4"},
   {n:"G",  f:392.00, finger:"5"},
   {n:"A",  f:440.00, finger:"5", step:true},
-  {n:"B",  f:493.88, finger:null},
-  {n:"C5", f:523.25, finger:null}
+  {n:"B",  f:493.88, finger:"5", step:true},
+  {n:"C5", f:523.25, finger:"5", step:true}
 ];
 const BLACK = [
   {after:0, f:277.18},{after:1, f:311.13},
   {after:3, f:369.99},{after:4, f:415.30},{after:5, f:466.16}
 ];
 const FREQ = {}; WHITE.forEach(w => { if (w.n.length === 1) FREQ[w.n] = w.f; });
-const FINGER = {C:"1", D:"2", E:"3", F:"4", G:"5", A:"5"};
+FREQ.C5 = 523.25; FREQ.Bb = 466.16;
+const FINGER = {C:"1", D:"2", E:"3", F:"4", G:"5", A:"5", Bb:"5", B:"5", C5:"5"};
+const LABEL = {C5:"C", Bb:"B\u266D"};
+// how many white keys a note needs on screen (B flat sits between A and B)
+const NEED = {C:1, D:2, E:3, F:4, G:5, A:6, Bb:7, B:7, C5:8};
 
 const SONGS = [
+{
+  id:"birthday", title:"Happy Birthday", bpm:92,
+  tip:"Wider than five fingers: the pinky steps up to A, B flat and the high C.",
+  phrases:[
+    [["C",.5],["C",.5],["D",1],["C",1],["F",1],["E",2]],
+    [["C",.5],["C",.5],["D",1],["C",1],["G",1],["F",2]],
+    [["C",.5],["C",.5],["C5",1],["A",1],["F",1],["E",2]],
+    [["Bb",.5],["Bb",.5],["A",1],["F",1],["G",1],["F",2]]
+  ]
+},
 {
   id:"snowflake", title:"Snowflake, Snowflake", bpm:88,
   tip:"Slow and gentle. The pinky steps to A once in the first and third lines.",
@@ -244,6 +265,12 @@ const SONGS = [
 ];
 
 const LYRICS = {
+  "birthday": [
+    "Hap|py birth|day to you",
+    "Hap|py birth|day to you",
+    "Hap|py birth|day dear friend",
+    "Hap|py birth|day to you"
+  ],
   "snowflake": [
     "Snow|flake, snow|flake, lit|tle snow|flake",
     "Lit|tle snow|flake fall|ing from the sky",
@@ -397,7 +424,7 @@ const keyEls = {};
 
 WHITE.forEach(w => {
   const b = document.createElement("button");
-  b.className = "key" + (w.finger ? "" : " mute");
+  b.className = "key";
   b.setAttribute("aria-label", "Note " + w.n);
   if (w.finger){
     const f = document.createElement("span");
@@ -413,7 +440,7 @@ WHITE.forEach(w => {
   b.addEventListener("contextmenu", e => e.preventDefault());
   whitesEl.appendChild(b);
   w.el = b;
-  if (w.n.length === 1) keyEls[w.n] = b;
+  keyEls[w.n] = b;
 });
 
 BLACK.forEach(bk => {
@@ -424,11 +451,13 @@ BLACK.forEach(bk => {
   b.addEventListener("contextmenu", e => e.preventDefault());
   blacksEl.appendChild(b);
   bk.el = b;
+  if (bk.after === 5) keyEls.Bb = b;
 });
 
+let needKeys = 6;
 function layout(){
   const narrow = Math.min(window.innerWidth, document.documentElement.clientWidth) < 640;
-  const visible = narrow ? 6 : 8;
+  const visible = Math.max(needKeys, narrow ? 6 : 8);
   WHITE.forEach((w, i) => { w.el.style.display = i < visible ? "" : "none"; });
 
   const vh = window.innerHeight || 700;
@@ -465,7 +494,6 @@ function hit(el, freq){
 
 const songsEl = document.getElementById("songs");
 const stripEl = document.getElementById("strip");
-const lyricsEl = document.getElementById("lyrics");
 const tipEl = document.getElementById("tip");
 const tempoEl = document.getElementById("tempo");
 const bpmEl = document.getElementById("bpm");
@@ -473,7 +501,7 @@ const playBtn = document.getElementById("play");
 const playLabel = document.getElementById("playLabel");
 const glyph = document.getElementById("glyph");
 
-let current = SONGS[0], chipEls = [], lyricEls = [], seq = [];
+let current = SONGS[0], chipEls = [], lyricEls = [], lineEls = [], seq = [];
 let playing = false, timers = [], voices = [];
 
 SONGS.forEach(s => {
@@ -494,9 +522,9 @@ function select(s){
   tempoEl.value = s.bpm;
   bpmEl.textContent = s.bpm;
   stripEl.innerHTML = "";
-  lyricsEl.innerHTML = "";
   chipEls = [];
   lyricEls = [];
+  lineEls = [];
   const lines = LYRICS[s.id] || [];
   stripEl.style.setProperty("--cols", Math.max(...s.phrases.map(p => p.length)));
   s.phrases.forEach((ph, pi) => {
@@ -505,7 +533,7 @@ function select(s){
     ph.forEach(([n]) => {
       const c = document.createElement("div");
       c.className = "chip";
-      c.innerHTML = "<b>" + n + "</b><span>" + FINGER[n] + "</span>";
+      c.innerHTML = "<b>" + (LABEL[n] || n) + "</b><span>" + FINGER[n] + "</span>";
       row.appendChild(c);
       chipEls.push(c);
     });
@@ -526,12 +554,29 @@ function select(s){
       });
       line.appendChild(w);
     });
-    lyricsEl.appendChild(line);
+    stripEl.appendChild(line);
+    lineEls.push(line);
   });
   seq = s.phrases.flat();
+  needKeys = Math.max(6, ...seq.map(([n]) => NEED[n]));
+  const used = new Set(seq.map(([n]) => n));
+  WHITE.forEach(w => w.el.classList.toggle("mute", !used.has(w.n)));
+  layout();
 }
 
 tempoEl.addEventListener("input", () => { bpmEl.textContent = tempoEl.value; });
+
+// +/- keep the melody going at the new tempo instead of forcing a restart
+function nudge(d){
+  const v = Math.min(140, Math.max(50, Number(tempoEl.value) + d));
+  if (v === Number(tempoEl.value)) return;
+  tempoEl.value = v;
+  bpmEl.textContent = v;
+  if (mode === "playing"){ pause(); start(); }
+}
+document.getElementById("slower").addEventListener("click", () => nudge(-4));
+document.getElementById("faster").addEventListener("click", () => nudge(4));
+tempoEl.addEventListener("change", () => { if (mode === "playing"){ pause(); start(); } });
 
 let mode = "stopped", cursor = 0, t0 = 0, marks = [];
 const restartBtn = document.getElementById("restart");
@@ -545,7 +590,7 @@ function killVoices(){
 function clearHighlights(){
   chipEls.forEach(c => c.classList.remove("on"));
   lyricEls.forEach(l => l.classList.remove("on"));
-  lyricsEl.querySelectorAll(".line").forEach(l => l.classList.remove("now"));
+  lineEls.forEach(l => l.classList.remove("now"));
   Object.values(keyEls).forEach(k => k.classList.remove("on"));
 }
 
@@ -593,8 +638,7 @@ function start(){
       const syl = lyricEls[i];
       if (syl){
         syl.classList.add("on");
-        const line = syl.closest(".line");
-        lyricsEl.querySelectorAll(".line").forEach(l => l.classList.toggle("now", l === line));
+        lineEls.forEach(l => l.classList.toggle("now", l === syl.closest(".line")));
       }
       light(keyEls[n], lit);
     }, (t0 + t - c.currentTime) * 1000));
@@ -620,7 +664,8 @@ restartBtn.addEventListener("click", () => {
 });
 
 const KEYMAP = {"1":"C","2":"D","3":"E","4":"F","5":"G","6":"A",
-                "a":"C","s":"D","d":"E","f":"F","g":"G","h":"A",
+                "7":"B","8":"C5",
+                "a":"C","s":"D","d":"E","f":"F","g":"G","h":"A","j":"B","k":"C5",
                 "ф":"C","ы":"D","в":"E","а":"F","п":"G","р":"A"};
 document.addEventListener("keydown", e => {
   if (e.repeat) return;
