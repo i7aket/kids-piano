@@ -886,10 +886,16 @@ const learnBtn = document.getElementById("learn");
 const debugEl = location.hash.includes("debug") ? document.getElementById("debug") : null;
 if (debugEl) debugEl.hidden = false;
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) learnBtn.hidden = true;
-const learn = {on:false, i:0, armed:false, quiet:false, hits:0, bad:0, noise:0.002,
-               stream:null, src:null, analyser:null, detector:null, buf:null, raf:0, gate:0, hint:0};
+const learn = {on:false, i:0, armed:false, hits:0, bad:0, noise:0.002,
+               lastHz:0, recent:[], evalUntil:0,
+               stream:null, src:null, analyser:null, detector:null, buf:null, raf:0, gate:0};
 
 function octaveName(n, d){ return n.replace(/\d/, m => String(Number(m) + d)); }
+// same note letter in any octave: octave slips at a note's onset must not look like a new note
+function samePitchClass(hz, ref){
+  const c = ((1200 * Math.log2(hz / ref)) % 1200 + 1200) % 1200;
+  return c <= 50 || c >= 1150;
+}
 // accept the target within a quarter tone; accept its octave neighbour only when
 // that note is not itself part of the song, so G3 vs G4 songs stay strict
 function matches(hz, n){
@@ -917,7 +923,7 @@ async function learnStart(){
   learn.src.connect(learn.analyser);
   learn.detector = PitchDetector.forFloat32Array(4096);
   learn.buf = new Float32Array(4096);
-  learn.on = true; learn.noise = 0.002;
+  learn.on = true; learn.noise = 0.002; learn.lastHz = 0; learn.recent = [];
   learnBtn.classList.add("on"); learnBtn.textContent = "■ Stop";
   playBtn.disabled = true;
   lastRow = null;
@@ -928,7 +934,7 @@ async function learnStart(){
 function learnStop(){
   if (!learn.on) return;
   learn.on = false;
-  cancelAnimationFrame(learn.raf); clearTimeout(learn.gate); clearInterval(learn.hint);
+  cancelAnimationFrame(learn.raf); clearTimeout(learn.gate);
   if (learn.stream) learn.stream.getTracks().forEach(t => t.stop());
   if (learn.src) learn.src.disconnect();
   learn.stream = learn.src = learn.analyser = null;
@@ -949,20 +955,17 @@ function showTarget(i){
 }
 
 function learnStep(i){
-  clearTimeout(learn.gate); clearInterval(learn.hint);
+  clearTimeout(learn.gate);
   if (i >= seq.length){
     tipEl.textContent = "Well done! You played the whole song.";
     Object.values(keyEls).forEach(k => k.classList.add("good"));
     setTimeout(learnStop, 1500);
     return;
   }
-  learn.i = i; learn.armed = false; learn.quiet = false; learn.hits = 0; learn.bad = 0;
+  learn.i = i; learn.hits = 0; learn.bad = 0; learn.evalUntil = 0;
   showTarget(i);
   tipEl.textContent = askTip(i);
-  const play = () => note(FREQ[seq[i][0]], audio().currentTime, .5);
-  play();
-  learn.gate = setTimeout(() => { learn.armed = true; }, 1200);   // let our own note ring out first
-  learn.hint = setInterval(play, 6000);
+  learn.armed = true;   // the page stays silent in Learn mode: it only waits
 }
 
 function askTip(i){ return "Play the " + plain(seq[i][0]) + " key on your piano."; }
@@ -970,9 +973,10 @@ function askTip(i){ return "Play the " + plain(seq[i][0]) + " key on your piano.
 // one wrong note -> one hint: colour the key that was played, say how far it is
 function learnMiss(hz){
   const i = learn.i, tgt = seq[i][0];
-  learn.hits = 0; learn.bad = 0;
-  learn.armed = false; learn.quiet = false;
-  learn.gate = setTimeout(() => { learn.armed = true; }, 700);
+  learn.hits = 0; learn.bad = 0; learn.evalUntil = 0;
+  learn.lastHz = hz;
+  learn.armed = false;
+  learn.gate = setTimeout(() => { learn.armed = true; }, 400);
 
   let best = null, bd = Infinity;
   ALLKEYS.forEach(k => { const d = Math.abs(1200 * Math.log2(hz / k.f)); if (d < bd){ bd = d; best = k; } });
@@ -1013,29 +1017,40 @@ function learnFrame(){
   // ponytail: crude adaptive noise floor (slow-rising minimum); replace with a real
   // level meter if phones with aggressive auto-gain never look "quiet"
   learn.noise = rms < learn.noise ? rms : learn.noise * 0.999 + rms * 0.001;
+  // level over the last ~160 ms: a decaying note barely moves it, a new attack jumps above it
+  learn.recent.push(rms); if (learn.recent.length > 10) learn.recent.shift();
+  const recentMin = Math.min(...learn.recent);
+  const loud = learn.noise * 4 + 0.006;
   if (debugEl){   // #debug in the URL: live readout for tuning on a real piano
     const [dhz, dcl] = rms > 0.003 ? learn.detector.findPitch(learn.buf, ctx.sampleRate) : [0, 0];
     const midi = dhz > 0 ? Math.round(69 + 12 * Math.log2(dhz / 440)) : null;
     const name = midi === null ? "-" : ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][midi % 12] + (Math.floor(midi / 12) - 1);
-    debugEl.textContent = "rms " + rms.toFixed(3) + " noise " + learn.noise.toFixed(3) + " | " + Math.round(dhz) + " Hz " + name +
-      " clarity " + dcl.toFixed(2) + " | armed " + learn.armed + " quiet " + learn.quiet + " hits " + learn.hits + " bad " + learn.bad;
+    debugEl.textContent = "rms " + rms.toFixed(3) + " noise " + learn.noise.toFixed(3) + " recent " + recentMin.toFixed(3) + " | " + Math.round(dhz) + " Hz " + name +
+      " clarity " + dcl.toFixed(2) + " | armed " + learn.armed + " eval " + (learn.evalUntil > performance.now()) + " hits " + learn.hits + " bad " + learn.bad;
   }
-  const quietLevel = learn.noise * 2 + 0.002, loudLevel = learn.noise * 4 + 0.006;
-  if (rms < quietLevel) learn.quiet = true;   // a gap must separate notes, so repeated notes count
-  if (learn.armed && learn.quiet && rms > loudLevel){
+  if (learn.armed && rms > loud){
     const [hz, clarity] = learn.detector.findPitch(learn.buf, ctx.sampleRate);
-    const right = clarity > 0.9 && matches(hz, seq[learn.i][0]);
-    learn.hits = right ? learn.hits + 1 : 0;
-    learn.bad = (clarity > 0.9 && !right) ? learn.bad + 1 : 0;
-    if (learn.bad >= 3) learnMiss(hz);
-    else if (learn.hits >= 3){
-      learn.armed = false; learn.hits = 0;
-      const i = learn.i, n = seq[i][0];
-      chipEls[i].classList.remove("target"); keyEls[n].classList.remove("target");
-      chipEls[i].classList.add("good"); keyEls[n].classList.add("good");
-      setTimeout(() => { chipEls[i].classList.remove("good"); keyEls[n].classList.remove("good"); if (learn.on) learnStep(i + 1); }, 450);
+    const now = performance.now();
+    if (clarity > 0.8){
+      // a new note is either a different pitch or a fresh attack of the same pitch
+      const fresh = !learn.lastHz || !samePitchClass(hz, learn.lastHz) || rms > recentMin * 1.35 + 0.005;
+      if (fresh && now > learn.evalUntil){ learn.evalUntil = now + 350; learn.hits = 0; learn.bad = 0; }
+      if (now <= learn.evalUntil){
+        const right = matches(hz, seq[learn.i][0]);
+        learn.hits = right ? learn.hits + 1 : 0;
+        learn.bad = right ? 0 : learn.bad + 1;
+        if (learn.bad >= 3) learnMiss(hz);
+        else if (learn.hits >= 3){
+          learn.armed = false; learn.hits = 0; learn.evalUntil = 0;
+          learn.lastHz = FREQ[seq[learn.i][0]];         // the same held note must re-attack to count again
+          const i = learn.i, n = seq[i][0];
+          chipEls[i].classList.remove("target"); keyEls[n].classList.remove("target");
+          chipEls[i].classList.add("good"); keyEls[n].classList.add("good");
+          setTimeout(() => { chipEls[i].classList.remove("good"); keyEls[n].classList.remove("good"); if (learn.on) learnStep(i + 1); }, 350);
+        }
+      }
     }
-  } else if (!learn.armed){ learn.hits = 0; learn.bad = 0; }
+  }
   learn.raf = requestAnimationFrame(learnFrame);
 }
 
